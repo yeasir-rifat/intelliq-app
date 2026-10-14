@@ -632,7 +632,7 @@ private fun FolderField(
     }
 }
 
-/* ───────────── Preview panel ───────────── */
+/* ───────────── Preview panel ──────────���── */
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -729,6 +729,7 @@ private fun PreviewPanel(
             val fit = minOf((maxWidth.value - 16f - 40f) / pw, (maxHeight.value - 16f - 40f) / ph, 1.2f)
                 .coerceAtLeast(0.1f)
             val scale = d.zoom / 100f * fit
+            val containerWidth = maxWidth - 16.dp
             Box(
                 Modifier
                     .fillMaxSize()
@@ -744,7 +745,7 @@ private fun PreviewPanel(
                     settings = d.settings,
                     showAnswers = showAnswers,
                     scale = scale,
-                    containerWidth = maxWidth - 16.dp,
+                    containerWidth = containerWidth,
                 )
             }
         }
