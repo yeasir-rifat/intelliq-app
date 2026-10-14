@@ -1,6 +1,13 @@
 package com.intelliq.rifatplex.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.ui.text.font.FontSynthesis
+import androidx.compose.ui.platform.LocalFontFamilyResolver
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -345,19 +352,15 @@ private fun HeaderBlock(doc: DocFields, st: PaperStyle) {
 @Composable
 private fun QuestionBlock(q: Question, number: Int, st: PaperStyle, showAnswers: Boolean) {
     Column(Modifier.fillMaxWidth().padding(bottom = 12.dp)) {
-        Row(Modifier.fillMaxWidth().padding(bottom = 5.dp)) {
-            Text(
-                "${formatNumber(number, st.bn)}.",
-                Modifier.widthIn(min = st.dp(1.5f)).padding(end = 6.dp),
-                color = st.color, fontFamily = st.family, fontWeight = FontWeight.Bold,
-                fontSize = st.sp(1f), lineHeight = st.sp(1.5f),
-            )
-            RichTextView(
-                q.text, Modifier.weight(1f),
-                color = st.color, fontFamily = st.family, fontWeight = FontWeight.Medium,
-                fontSize = st.sp(1f), lineHeight = st.sp(1.5f),
-            )
-        }
+        RichTextView(
+            q.text,
+            Modifier.fillMaxWidth().padding(bottom = 5.dp),
+            prefix = buildAnnotatedString {
+                withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append("${formatNumber(number, st.bn)}.  ") }
+            },
+            color = st.color, fontFamily = st.family, fontWeight = FontWeight.Medium,
+            fontSize = st.sp(1f), lineHeight = st.sp(1.5f),
+        )
         OptionsBlock(q, st, showAnswers)
         if (showAnswers && plainText(q.explanation).isNotBlank()) {
             val label = trKey("label.explanation", if (st.bn) Lang.BN else Lang.EN)
@@ -405,20 +408,15 @@ private fun OptionsBlock(q: Question, st: PaperStyle, showAnswers: Boolean) {
 @Composable
 private fun OptionItem(index: Int, text: String, correct: Boolean, st: PaperStyle, fillText: Boolean) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Box(
-            Modifier
-                .size(st.dp(1.152f))
-                .clip(CircleShape)
-                .background(if (correct) GREEN else Color.Transparent)
-                .border(1.dp, if (correct) GREEN else st.color, CircleShape),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                optionLabel(index, st.bn),
-                color = if (correct) Color.White else st.color, fontFamily = st.family,
-                fontWeight = FontWeight.Bold, fontSize = st.sp(0.768f),
-            )
-        }
+        OptionBadge(
+            label = optionLabel(index, st.bn),
+            textColor = if (correct) Color.White else st.color,
+            family = st.family,
+            textSize = st.sp(0.768f),
+            diameter = st.dp(1.152f),
+            fill = if (correct) GREEN else Color.Transparent,
+            stroke = if (correct) GREEN else st.color,
+        )
         RichTextView(
             text,
             if (fillText) Modifier.weight(1f) else Modifier,
@@ -426,5 +424,39 @@ private fun OptionItem(index: Int, text: String, correct: Boolean, st: PaperStyl
             fontWeight = if (correct) FontWeight.Bold else FontWeight.Normal,
             fontSize = st.sp(0.96f), lineHeight = st.sp(1.344f),
         )
+    }
+}
+
+/** Circle with the option letter exactly in the middle (uses the real glyph bounds, so Bangla letters are centred too). */
+@Composable
+private fun OptionBadge(
+    label: String,
+    textColor: Color,
+    family: FontFamily,
+    textSize: TextUnit,
+    diameter: Dp,
+    fill: Color,
+    stroke: Color,
+) {
+    val resolver = LocalFontFamilyResolver.current
+    val typeface = remember(family) {
+        resolver.resolve(family, FontWeight.Bold, FontStyle.Normal, FontSynthesis.All).value as? android.graphics.Typeface
+    }
+    Canvas(Modifier.size(diameter)) {
+        val strokeW = 1.dp.toPx()
+        val r = size.minDimension / 2f
+        drawCircle(fill, radius = r)
+        drawCircle(stroke, radius = r - strokeW / 2f, style = Stroke(strokeW))
+        drawIntoCanvas { canvas ->
+            val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
+            paint.color = textColor.toArgb()
+            paint.textSize = textSize.toPx()
+            if (typeface != null) paint.typeface = typeface
+            val bounds = android.graphics.Rect()
+            paint.getTextBounds(label, 0, label.length, bounds)
+            val x = size.width / 2f - (bounds.left + bounds.right) / 2f
+            val y = size.height / 2f - (bounds.top + bounds.bottom) / 2f
+            canvas.nativeCanvas.drawText(label, x, y, paint)
+        }
     }
 }
