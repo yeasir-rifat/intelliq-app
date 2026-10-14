@@ -1,0 +1,144 @@
+package com.intelliq.rifatplex.ui
+
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.ui.text.font.FontFamily
+import com.intelliq.rifatplex.ui.theme.HindSiliguri
+import com.intelliq.rifatplex.ui.theme.Poppins
+
+enum class Lang { EN, BN }
+
+val LocalLang = compositionLocalOf { Lang.EN }
+
+// Strings the website keeps inline in its HTML/JS (not in the i18n dictionary).
+private val EXTRA_EN = mapOf(
+    "ph.title" to "Enter examination title",
+    "ph.subtitle" to "Enter subtitle / institution name",
+    "ph.marks" to "50",
+    "ph.time" to "60 Minutes",
+    "ph.note" to "Enter instructions or note...",
+    "ph.question" to "Type your question...",
+    "ph.option" to "Option text...",
+    "ph.explain" to "Explain why this answer is correct...",
+    "ph.setNames" to "A, B, C",
+    "ph.geminiKey" to "Paste your Gemini API key",
+    "label.mcq" to "MCQ",
+    "label.explanation" to "Explanation",
+    "doc.set" to "Set",
+    "doc.titleDefault" to "Examination Title",
+    "doc.subtitleDefault" to "Subtitle",
+    "doc.marks" to "Marks",
+    "doc.time" to "Time",
+    "doc.marksDefault" to "0",
+    "doc.timeDefault" to "0 Minutes",
+    "doc.note" to "Note",
+    "doc.noteDefault" to "Add a note...",
+    "doc.empty" to "Add a question to see the live preview...",
+    "doc.page" to "Page",
+    "model.25lite" to "Gemini 2.5 Flash-Lite",
+    "model.20flash" to "Gemini 2.0 Flash",
+    "todo.next" to "This feature will be available in the next update.",
+    "toast.pdfError" to "Unable to generate PDF. Please try again.",
+    "toast.pdfGenerated" to "PDF generated successfully",
+    "toast.zipGenerated" to "ZIP (all sets) generated successfully",
+    "download.noQuestions" to "Add at least one question before downloading.",
+    "download.savedTo" to "Saved in Downloads/IntelliQ",
+    "download.shareSheet" to "Choose where to save the file.",
+    "download.working" to "Creating PDF…",
+    "folder.rename" to "Rename folder",
+    "ai.err.missingKey" to "Add your Gemini API key in Settings first.",
+    "ai.err.noFile" to "Capture a photo or upload a file first.",
+    "ai.err.noTopic" to "Type a subject or topic (e.g. \"World War II\") first.",
+    "ai.err.waitUpload" to "Please wait for the files to finish uploading.",
+    "ai.err.max10" to "You can attach up to 10 files.",
+    "ai.err.max10Remove" to "You can attach up to 10 files. Remove one first.",
+    "ai.err.onlyMore" to "Only {n} more file(s) can be added (max 10).",
+    "ai.err.oldFormat" to "Older .doc/.ppt/.xls formats aren't supported. Please save as .docx/.pptx/PDF and try again.",
+    "ai.err.badType" to "Please choose an image, PDF, DOCX, or PPTX file.",
+    "ai.err.tooLarge" to "\"{name}\" is too large (~{size}MB). Please use a file under ~43MB, or split it into smaller files.",
+    "ai.err.overLimit" to "Adding \"{name}\" would push your attached files over the size limit for one request. Remove a file or use smaller ones.",
+    "ai.err.cantRead" to "Could not read {name}.",
+    "ai.err.docRead" to "Couldn't read {name}. The file may be empty, corrupted, or password-protected.",
+    "ai.err.noCamera" to "No camera app found on this device.",
+    "ai.err.network" to "Network error while contacting Gemini. Check your connection and try again.",
+    "ai.err.empty" to "The model returned an empty response. Try a clearer image.",
+    "ai.err.parse" to "Could not understand the AI response. Try rephrasing your prompt.",
+    "ai.err.noUsable" to "No usable questions were generated.",
+    "ai.err.allUnavailable" to "All models are currently unavailable. Please try again later.",
+    "ai.err.generic" to "Something went wrong. Please try again.",
+    "ai.err.request" to "Request failed ({code}).",
+)
+
+private val EXTRA_BN = mapOf(
+    "ph.title" to "পরীক্ষার শিরোনাম লিখুন",
+    "ph.subtitle" to "সাব-টাইটেল / প্রতিষ্ঠানের নাম লিখুন",
+    "ph.marks" to "৫০",
+    "ph.time" to "৬০ মিনিট",
+    "ph.note" to "নির্দেশনা বা নোট লিখুন...",
+    "ph.question" to "প্রশ্ন লিখুন...",
+    "ph.option" to "অপশন লিখুন...",
+    "ph.explain" to "সঠিক উত্তরের ব্যাখ্যা লিখুন...",
+    "ph.setNames" to "A, B, C",
+    "ph.geminiKey" to "আপনার জেমিনি এপিআই কী পেস্ট করুন",
+    "label.mcq" to "প্রশ্ন",
+    "label.explanation" to "ব্যাখ্যা",
+    "doc.set" to "সেট",
+    "doc.titleDefault" to "শিরোনাম",
+    "doc.subtitleDefault" to "উপশিরোনাম",
+    "doc.marks" to "মান",
+    "doc.time" to "সময়",
+    "doc.marksDefault" to "০",
+    "doc.timeDefault" to "০ মিনিট",
+    "doc.note" to "নোট",
+    "doc.noteDefault" to "নোট যোগ করুন...",
+    "doc.empty" to "প্রশ্ন যোগ করুন প্রিভিউ দেখতে...",
+    "doc.page" to "পৃষ্ঠা",
+    "model.25lite" to "জেমিনি ২.৫ ফ্ল্যাশ-লাইট",
+    "model.20flash" to "জেমিনি ২.০ ফ্ল্যাশ",
+    "todo.next" to "এই ফিচারটি পরের আপডেটে আসছে।",
+    "toast.pdfError" to "পিডিএফ তৈরি করা যায়নি। আবার চেষ্টা করুন।",
+    "toast.pdfGenerated" to "পিডিএফ সফলভাবে তৈরি হয়েছে",
+    "toast.zipGenerated" to "জিপ (সব সেট) সফলভাবে তৈরি হয়েছে",
+    "download.noQuestions" to "ডাউনলোডের আগে অন্তত একটি প্রশ্ন যোগ করুন।",
+    "download.savedTo" to "Downloads/IntelliQ ফোল্ডারে সেভ হয়েছে",
+    "download.shareSheet" to "ফাইলটি কোথায় সেভ করবেন বেছে নিন।",
+    "download.working" to "পিডিএফ তৈরি হচ্ছে…",
+    "folder.rename" to "ফোল্ডারের নাম পরিবর্তন",
+    "ai.err.missingKey" to "আগে সেটিংসে আপনার জেমিনি এপিআই কী যোগ করুন।",
+    "ai.err.noFile" to "আগে একটি ছবি তুলুন বা ফাইল আপলোড করুন।",
+    "ai.err.noTopic" to "আগে একটি বিষয় বা টপিক লিখুন (যেমন: \"মুক্তিযুদ্ধ\")।",
+    "ai.err.waitUpload" to "ফাইলগুলোর আপলোড শেষ হওয়া পর্যন্ত অপেক্ষা করুন।",
+    "ai.err.max10" to "সর্বোচ্চ ১০টি ফাইল যুক্ত করা যাবে।",
+    "ai.err.max10Remove" to "সর্বোচ্চ ১০টি ফাইল যুক্ত করা যাবে। আগে একটি সরিয়ে ফেলুন।",
+    "ai.err.onlyMore" to "আরও মাত্র {n}টি ফাইল যোগ করা যাবে (সর্বোচ্চ ১০টি)।",
+    "ai.err.oldFormat" to "পুরনো .doc/.ppt/.xls ফরম্যাট সাপোর্ট করে না। .docx/.pptx/PDF হিসেবে সেভ করে আবার চেষ্টা করুন।",
+    "ai.err.badType" to "অনুগ্রহ করে ছবি, PDF, DOCX বা PPTX ফাইল বেছে নিন।",
+    "ai.err.tooLarge" to "\"{name}\" ফাইলটি অনেক বড় (~{size}MB)। ~৪৩MB এর কম ফাইল ব্যবহার করুন, অথবা ছোট ছোট ফাইলে ভাগ করুন।",
+    "ai.err.overLimit" to "\"{name}\" যোগ করলে একটি রিকোয়েস্টের সাইজ সীমা ছাড়িয়ে যাবে। একটি ফাইল সরান বা ছোট ফাইল ব্যবহার করুন।",
+    "ai.err.cantRead" to "{name} পড়া যায়নি।",
+    "ai.err.docRead" to "{name} পড়া যায়নি। ফাইলটি খালি, নষ্ট বা পাসওয়ার্ড দিয়ে সুরক্ষিত হতে পারে।",
+    "ai.err.noCamera" to "এই ডিভাইসে কোনো ক্যামেরা অ্যাপ পাওয়া যায়নি।",
+    "ai.err.network" to "জেমিনির সাথে যোগাযোগের সময় নেটওয়ার্ক সমস্যা হয়েছে। সংযোগ দেখে আবার চেষ্টা করুন।",
+    "ai.err.empty" to "মডেল কোনো উত্তর দেয়নি। আরও স্পষ্ট ছবি দিয়ে চেষ্টা করুন।",
+    "ai.err.parse" to "এআই-এর উত্তর বোঝা যায়নি। প্রম্পটটি অন্যভাবে লিখে চেষ্টা করুন।",
+    "ai.err.noUsable" to "ব্যবহারযোগ্য কোনো প্রশ্ন তৈরি হয়নি।",
+    "ai.err.allUnavailable" to "এই মুহূর্তে কোনো মডেলই উপলব্ধ নেই। পরে আবার চেষ্টা করুন।",
+    "ai.err.generic" to "কিছু একটা ভুল হয়েছে। আবার চেষ্টা করুন।",
+    "ai.err.request" to "রিকোয়েস্ট ব্যর্থ হয়েছে ({code})।",
+)
+
+fun trKey(key: String, lang: Lang): String {
+    val main = if (lang == Lang.BN) BN_STRINGS else EN_STRINGS
+    val extra = if (lang == Lang.BN) EXTRA_BN else EXTRA_EN
+    return main[key] ?: extra[key] ?: key
+}
+
+@Composable
+fun tr(key: String): String = trKey(key, LocalLang.current)
+
+/** "3 questions" / "৩ টি প্রশ্ন" - same pattern as the website. */
+fun countText(n: Int, lang: Lang, singularKey: String, pluralKey: String): String =
+    "$n ${trKey(if (n == 1) singularKey else pluralKey, lang)}"
+
+@Composable
+fun uiFont(): FontFamily = if (LocalLang.current == Lang.BN) HindSiliguri else Poppins
