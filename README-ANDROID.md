@@ -1,3 +1,32 @@
+# IntelliQ Android - Step 8 (splash screen + speed)
+
+- **Splash**: the app no longer opens on a white screen. The system splash shows the logo on the app background
+  (`Theme.IntelliQ.Splash`, `core-splashscreen`), followed by a short logo + "IntelliQ" screen (`SplashScreenView`).
+- **Faster start**: saved papers (History) load in the background; saving the document / History is encoded off the main thread.
+- **Faster typing**: Compose strong skipping is on, so only the question card you edit is redrawn.
+- **Faster app**: the workflow now builds the **release** APK (R8 shrinking, optimised code). It is signed with the debug key,
+  so uninstall an older IntelliQ build once before installing it. Artifact name: `IntelliQ-apk`.
+
+# IntelliQ Android (native) - Step 7 (toasts, premium icons, fonts)
+
+## What is new in Step 7
+- **Messages (toasts)** now appear at the **bottom** of the screen as a small pill with an icon (green check = success,
+  red warning = error) and use very short text, e.g. "Question paper saved", "ZIP saved", "Saved", "PDF failed, try again".
+  AI errors are shortened for the toast ("No internet", "AI unavailable now"); the AI dialog still shows the full text.
+- **Premium icons**: all Material icons were replaced by Phosphor Icons (Duotone, Bold for tiny arrows/close/plus) in
+  `ui/theme/PremiumIcons.kt`. The `material-icons-extended` dependency was removed.
+- **App UI fonts**: English = Lato, Bangla = Noto Serif Bengali (real 400/500/600/700 weights from the variable font).
+  The "IntelliQ" wordmark in the header keeps Poppins.
+- **PDF / paper fonts** (preview and PDF are drawn by the same code), chosen per character:
+  Bangla = Kalpurush, English = Times New Roman look (Tinos), fractions / sub- / superscripts / math symbols = Cambria look (Caladea).
+  See `ui/PaperFonts.kt`. Settings → Font Family still lets you pick another font.
+- `android/FONT-LICENSES.md` lists every font and the icon set with its licence.
+
+## New / changed files
+- new: `ui/PaperFonts.kt`, `ui/theme/PremiumIcons.kt`, `res/font/kalpurush.ttf`, `FONT-LICENSES.md`
+- changed: `ui/theme/Fonts.kt`, `ui/Components.kt` (ToastHost), `ui/Paper.kt`, `ui/Fraction.kt`, `ui/I18n.kt`, `ui/Strings.kt`,
+  `ui/AiViewModel.kt`, `ui/IntelliQApp.kt` and the other UI files (icons), `scripts/fetch_fonts.sh` (+Lato), `app/build.gradle.kts`
+
 # IntelliQ Android (native) - Step 6 (PDF download, History, Folders)
 
 Replace the `android/` and `.github/` folders in your repository root with these, push to `main`,
