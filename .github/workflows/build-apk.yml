@@ -21,13 +21,13 @@ jobs:
         with:
           gradle-version: "8.9"
 
-      - name: Download fonts (Poppins, Hind Siliguri, Noto Serif Bengali)
+      - name: Download fonts (Lato, Noto Serif Bengali, Tinos, Caladea, ...)
         run: bash android/scripts/fetch_fonts.sh
 
-      - name: Build debug APK
-        run: gradle -p android :app:assembleDebug --no-daemon --stacktrace
+      - name: Build release APK (fast, signed with the debug key)
+        run: gradle -p android :app:assembleRelease --no-daemon --stacktrace
 
       - uses: actions/upload-artifact@v4
         with:
-          name: IntelliQ-debug-apk
-          path: android/app/build/outputs/apk/debug/*.apk
+          name: IntelliQ-apk
+          path: android/app/build/outputs/apk/release/*.apk
