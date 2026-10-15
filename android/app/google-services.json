@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "108765837257",
+    "project_id": "intelliq-47799",
+    "storage_bucket": "intelliq-47799.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:108765837257:android:0180b5c36610bc3fa39a18",
+        "android_client_info": {
+          "package_name": "com.intelliq.rifatplex"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "108765837257-p3ob46ajk0173u32mpq2nuqj2mfsp4va.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAOFRpt0xELGhWE0IuEYlWpU2t2LgwegW0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "108765837257-p3ob46ajk0173u32mpq2nuqj2mfsp4va.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
