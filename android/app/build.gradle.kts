@@ -47,6 +47,8 @@ android {
         jvmTarget = "17"
         // Strong skipping: a question card is not redrawn on every keystroke unless its own data changed.
         freeCompilerArgs += listOf("-P", "plugin:androidx.compose.compiler.plugins.kotlin:experimentalStrongSkipping=true")
+        // HorizontalPager / PagerState are @ExperimentalFoundationApi (IntelliQApp.kt). Opt in once for the whole module.
+        freeCompilerArgs += "-opt-in=androidx.compose.foundation.ExperimentalFoundationApi"
     }
     buildFeatures { compose = true }
     composeOptions { kotlinCompilerExtensionVersion = "1.5.14" }
