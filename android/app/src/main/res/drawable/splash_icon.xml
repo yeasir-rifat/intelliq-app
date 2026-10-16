@@ -1,8 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!-- Logo with padding, so Android 12's round icon mask does not crop it. -->
-<inset xmlns:android="http://schemas.android.com/apk/res/android"
-    android:drawable="@drawable/logo"
-    android:insetLeft="26%"
-    android:insetTop="26%"
-    android:insetRight="26%"
-    android:insetBottom="26%" />
