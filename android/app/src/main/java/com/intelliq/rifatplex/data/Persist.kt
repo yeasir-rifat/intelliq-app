@@ -1,0 +1,216 @@
+package com.intelliq.rifatplex.data
+
+import org.json.JSONArray
+import org.json.JSONObject
+
+private fun JSONArray.objects(): List<JSONObject> = (0 until length()).map { getJSONObject(it) }
+
+private fun encodeQuestion(q: Question): JSONObject {
+    val o = JSONObject()
+        .put("id", q.id)
+        .put("text", q.text)
+        .put("layout", q.layout)
+        .put("explanation", q.explanation)
+        .put(
+            "options",
+            JSONArray().apply {
+                q.options.forEach {
+                    put(JSONObject().put("id", it.id).put("text", it.text).put("correct", it.correct))
+                }
+            },
+        )
+    // New (website parity) fields are written only when they carry something, so old and new data stay compatible.
+    if (q.kind() != QType.MCQ) o.put("type", q.kind())
+    if (q.marks.isNotBlank()) o.put("marks", q.marks)
+    if (q.tfAnswer != null) o.put("tfAnswer", q.tfAnswer)
+    if (q.answer.isNotEmpty()) o.put("answer", q.answer)
+    if (q.cols != null) o.put("cols", q.cols)
+    if (q.subs.isNotEmpty()) {
+        o.put(
+            "subs",
+            JSONArray().apply {
+                q.subs.forEach {
+                    put(JSONObject().put("id", it.id).put("text", it.text).put("marks", it.marks).put("answer", it.answer))
+                }
+            },
+        )
+    }
+    return o
+}
+
+private fun decodeQuestion(o: JSONObject): Question {
+    val opts = o.optJSONArray("options")?.objects()?.map {
+        Option(it.optString("id"), it.optString("text"), it.optBoolean("correct"))
+    }
+    val subs = o.optJSONArray("subs")?.objects()?.map {
+        SubQuestion(it.optString("id", uid("sq")), it.optString("text"), it.optString("marks"), it.optString("answer"))
+    } ?: emptyList()
+    return Question(
+        id = o.optString("id", uid("q")),
+        text = o.optString("text"),
+        layout = o.optString("layout", "vertical"),
+        explanation = o.optString("explanation"),
+        options = if (opts.isNullOrEmpty()) defaultOptions() else opts,
+        type = QType.normalize(o.optString("type", QType.MCQ)),
+        marks = o.optString("marks"),
+        tfAnswer = if (o.has("tfAnswer") && !o.isNull("tfAnswer")) o.optBoolean("tfAnswer") else null,
+        answer = o.optString("answer"),
+        subs = subs,
+        cols = o.optInt("cols", 0).takeIf { it in 1..3 },
+    ).ensured()
+}
+
+private fun encodeSettings(st: DocSettings): JSONObject {
+    val o = JSONObject().put("pageSize", st.pageSize).put("pageColor", st.pageColor)
+        .put("fontFamily", st.fontFamily).put("fontSize", st.fontSize)
+        .put("fontColor", st.fontColor).put("chemAuto", st.chemAuto)
+        .put("sectionMode", st.sectionMode)
+        .put("sectionOrder", JSONArray(st.orderedTypes()))
+        .put("sectionLayout", st.sectionLayout)
+        .put("sectionDividerOff", JSONArray(st.sectionDividerOff.toList()))
+        .put("sectionLineOff", JSONArray(st.sectionLineOff.toList()))
+        .put("showMarks", st.showMarks)
+    o.put("typeCols", JSONObject().apply { st.typeCols.forEach { (k, v) -> put(k, v) } })
+    o.put(
+        "sectionMeta",
+        JSONObject().apply {
+            st.sectionMeta.forEach { (k, v) -> put(k, JSONObject().put("title", v.title).put("instruction", v.instruction)) }
+        },
+    )
+    return o
+}
+
+private fun JSONArray?.strings(): List<String> = if (this == null) emptyList() else (0 until length()).map { optString(it) }
+
+private fun decodeSettings(st: JSONObject, def: DocSettings): DocSettings {
+    val cols = HashMap<String, Int>()
+    st.optJSONObject("typeCols")?.let { c ->
+        c.keys().forEach { k -> c.optInt(k, 0).takeIf { it in 1..3 }?.let { v -> cols[k] = v } }
+    }
+    val meta = HashMap<String, SectionMeta>()
+    st.optJSONObject("sectionMeta")?.let { m ->
+        m.keys().forEach { k ->
+            m.optJSONObject(k)?.let { mo -> meta[k] = SectionMeta(mo.optString("title"), mo.optString("instruction")) }
+        }
+    }
+    val order = st.optJSONArray("sectionOrder").strings().filter { it in QType.ALL }
+    return DocSettings(
+        pageSize = st.optString("pageSize", def.pageSize),
+        pageColor = st.optString("pageColor", def.pageColor),
+        fontFamily = st.optString("fontFamily", def.fontFamily),
+        fontSize = st.optInt("fontSize", def.fontSize),
+        fontColor = st.optString("fontColor", def.fontColor),
+        chemAuto = st.optBoolean("chemAuto", false),
+        typeCols = cols,
+        sectionMode = st.optBoolean("sectionMode", true),
+        sectionOrder = if (order.isEmpty()) QType.ALL else order,
+        sectionMeta = meta,
+        sectionLayout = st.optString("sectionLayout", "left").takeIf { it == "center" } ?: "left",
+        sectionDividerOff = st.optJSONArray("sectionDividerOff").strings().toSet(),
+        sectionLineOff = st.optJSONArray("sectionLineOff").strings().toSet(),
+        showMarks = st.optBoolean("showMarks", true),
+    ).let { it.copy(sectionOrder = it.orderedTypes()) }
+}
+
+fun encodeData(d: AppData): String {
+    val o = JSONObject()
+    o.put("language", d.language)
+    o.put("dark", d.dark)
+    o.put("zoom", d.zoom)
+    o.put("folderId", d.folderId ?: JSONObject.NULL)
+    o.put(
+        "doc",
+        JSONObject().put("title", d.doc.title).put("subtitle", d.doc.subtitle)
+            .put("marks", d.doc.marks).put("time", d.doc.time).put("note", d.doc.note),
+    )
+    o.put("questions", JSONArray().apply { d.questions.forEach { put(encodeQuestion(it)) } })
+    o.put("settings", encodeSettings(d.settings))
+    o.put(
+        "setCode",
+        JSONObject().put("enabled", d.setCode.enabled).put("numberOfSets", d.setCode.numberOfSets)
+            .put("codeNames", d.setCode.codeNames).put("randomization", d.setCode.randomization),
+    )
+    o.put(
+        "generatedSets",
+        JSONArray().apply {
+            d.generatedSets.forEach { s ->
+                put(
+                    JSONObject().put("code", s.code)
+                        .put("questions", JSONArray().apply { s.questions.forEach { put(encodeQuestion(it)) } }),
+                )
+            }
+        },
+    )
+    o.put("activeSetIndex", d.activeSetIndex)
+    o.put(
+        "ai",
+        JSONObject().put("apiKey", d.ai.apiKey).put("model", d.ai.model).put("insertMode", d.ai.insertMode)
+            .put("difficulty", d.ai.difficulty).put("answers", d.ai.answers).put("explanations", d.ai.explanations)
+            .put(
+                "types",
+                org.json.JSONArray(d.ai.types.map { JSONObject().put("type", it.type).put("enabled", it.enabled).put("count", it.count) }),
+            ),
+    )
+    return o.toString()
+}
+
+fun decodeData(json: String): AppData {
+    val o = JSONObject(json)
+    val def = AppData()
+    val doc = o.optJSONObject("doc")
+    val st = o.optJSONObject("settings")
+    val sc = o.optJSONObject("setCode")
+    val ai = o.optJSONObject("ai")
+    return AppData(
+        language = o.optString("language", "en"),
+        dark = o.optBoolean("dark", false),
+        zoom = o.optInt("zoom", 100),
+        folderId = if (o.isNull("folderId")) null else o.optString("folderId").takeIf { it.isNotEmpty() },
+        doc = if (doc == null) def.doc else DocFields(
+            doc.optString("title"), doc.optString("subtitle"), doc.optString("marks"),
+            doc.optString("time"), doc.optString("note"),
+        ),
+        questions = o.optJSONArray("questions")?.objects()?.map { decodeQuestion(it) }
+            ?.takeIf { it.isNotEmpty() } ?: def.questions,
+        settings = if (st == null) def.settings else decodeSettings(st, def.settings),
+        setCode = if (sc == null) def.setCode else SetCodeSettings(
+            enabled = sc.optBoolean("enabled", false),
+            numberOfSets = sc.optInt("numberOfSets", 1),
+            codeNames = sc.optString("codeNames", def.setCode.codeNames),
+            randomization = sc.optString("randomization", "both"),
+        ),
+        generatedSets = o.optJSONArray("generatedSets")?.objects()?.map { s ->
+            GeneratedSet(
+                s.optString("code"),
+                s.optJSONArray("questions")?.objects()?.map { decodeQuestion(it) } ?: emptyList(),
+            )
+        } ?: emptyList(),
+        activeSetIndex = o.optInt("activeSetIndex", -1),
+        ai = if (ai == null) def.ai else AiSettings(
+            apiKey = ai.optString("apiKey"),
+            model = ai.optString("model", def.ai.model).let { if (it in GeminiClient.MODELS) it else def.ai.model }, // retired model -> default
+            insertMode = ai.optString("insertMode", "append"),
+            types = decodeAiTypes(ai.optJSONArray("types")),
+            difficulty = ai.optString("difficulty", "mixed").ifEmpty { "mixed" },
+            answers = ai.optBoolean("answers", true),
+            explanations = ai.optBoolean("explanations", true),
+        ),
+    )
+}
+
+
+/** Every type exactly once; missing ones come back with the website defaults (old saves have no "types"). */
+private fun decodeAiTypes(arr: org.json.JSONArray?): List<AiTypeCfg> {
+    val def = defaultAiTypes()
+    if (arr == null) return def
+    val out = ArrayList<AiTypeCfg>()
+    for (i in 0 until arr.length()) {
+        val o = arr.optJSONObject(i) ?: continue
+        val t = o.optString("type")
+        val d = def.firstOrNull { it.type == t } ?: continue
+        if (out.any { it.type == t }) continue
+        out.add(AiTypeCfg(t, o.optBoolean("enabled", d.enabled), o.optInt("count", d.count).coerceIn(1, 100)))
+    }
+    def.forEach { d -> if (out.none { it.type == d.type }) out.add(d) }
+    return out
+}
