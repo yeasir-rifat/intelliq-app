@@ -1,0 +1,36 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [main]
+    paths: ["android/**", ".github/workflows/build-apk.yml"]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
+
+      - name: Download fonts (Lato, Noto Serif Bengali, Tinos, Caladea, ...)
+        run: bash android/scripts/fetch_fonts.sh
+
+      - name: Build release APK (fast, signed with the debug key)
+        run: gradle -p android :app:assembleRelease --no-daemon --stacktrace
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: IntelliQ-apk
+          path: android/app/build/outputs/apk/release/*.apk
+
+      - name: Unit tests (OMR geometry, QR code, exam id)
+        run: gradle -p android :app:testDebugUnitTest --no-daemon --stacktrace

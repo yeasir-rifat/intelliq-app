@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="sharedpref" path="intelliq_state.xml" />
+        <exclude domain="sharedpref" path="intelliq_cloud.xml" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="sharedpref" path="intelliq_state.xml" />
+        <exclude domain="sharedpref" path="intelliq_cloud.xml" />
+    </device-transfer>
+</data-extraction-rules>
