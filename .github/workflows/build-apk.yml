@@ -31,3 +31,6 @@ jobs:
         with:
           name: IntelliQ-apk
           path: android/app/build/outputs/apk/release/*.apk
+
+      - name: Unit tests (OMR geometry, QR code, exam id)
+        run: gradle -p android :app:testDebugUnitTest --no-daemon --stacktrace
