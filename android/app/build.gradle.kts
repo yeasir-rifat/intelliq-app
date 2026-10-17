@@ -81,6 +81,7 @@ dependencies {
     implementation("androidx.camera:camera-camera2:1.3.4")
     implementation("androidx.camera:camera-lifecycle:1.3.4")
     implementation("androidx.camera:camera-view:1.3.4")
+    implementation("com.google.guava:listenablefuture:1.0")
 
     // Step 4.1: JVM tests for the OMR geometry (run with: gradle :app:testDebugUnitTest). Not part of the APK.
     testImplementation("junit:junit:4.13.2")
