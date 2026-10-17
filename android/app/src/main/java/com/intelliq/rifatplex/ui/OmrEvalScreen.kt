@@ -310,12 +310,11 @@ internal fun OmrEvalSection(d: AppData) {
                 Text(tr("eval.rules"), color = c.text, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, fontFamily = uiFont())
                 if (!rulesInfo.second) InfoTip(rulesInfo.first) // the "marking with ..." line is a tooltip; only an error stays visible
             }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.Bottom) {
                 RuleField(tr("eval.marks"), c.success, vm.marksText, tr("eval.asExam"), Modifier.weight(1f)) { v -> vm.marksText = cleanNumber(v); vm.settingsChanged() }
                 RuleField(tr("eval.negative"), c.danger, vm.negText, tr("eval.asExam"), Modifier.weight(1f)) { v -> vm.negText = cleanNumber(v); vm.settingsChanged() }
             }
             if (rulesInfo.second) Text(rulesInfo.first, color = c.danger, fontSize = 12.sp, fontWeight = FontWeight.Medium, fontFamily = uiFont())
-            SwitchRow(tr("eval.multi"), tr("eval.multi.hint"), vm.penalizeMulti) { v -> vm.penalizeMulti = v; vm.settingsChanged() }
         }
 
         // ---- 4. answer sheet import by QR / PDF (step 4.9) ----

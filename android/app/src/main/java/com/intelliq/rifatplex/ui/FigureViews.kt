@@ -94,7 +94,7 @@ fun FigureBlock(
 ) {
     val n = fig.pics.size
     if (n == 0) return
-    val images = fig.pics.map { p -> p to PicCache.get(p.url) }
+    val images = remember(fig.pics) { fig.pics.map { p -> p to PicCache.get(p.url) } }
     val pct = figWidthPct(fig.size, n) / 100f
     val align = fig.align
     Layout(
@@ -484,7 +484,9 @@ fun CleanDialog(pic: Pic, onDismiss: () -> Unit, onDone: (Pic) -> Unit) {
         delay(40)
         val lv = level.toInt()
         val tr = transparent
-        preview = withContext(Dispatchers.Default) { ImageTools.cleanRender(d, lv, tr).asImageBitmap() }
+        preview = withContext(Dispatchers.Default) {
+            try { ImageTools.cleanRender(d, lv, tr).asImageBitmap() } catch (e: Throwable) { null }
+        } ?: preview
     }
 
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
@@ -537,7 +539,7 @@ fun CleanDialog(pic: Pic, onDismiss: () -> Unit, onDone: (Pic) -> Unit) {
                         scope.launch {
                             val out = withContext(Dispatchers.Default) { ImageTools.cleanFinish(d, lv, tp) }
                             busy = false
-                            onDone(out)
+                            if (out != null) onDone(out) else onDismiss()
                         }
                     }
                 }

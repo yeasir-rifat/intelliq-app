@@ -128,16 +128,29 @@ private fun applyTag(name: String, attrs: String, cur: CharStyle): CharStyle {
     return s
 }
 
-/** Small LRU: the same question HTML is parsed again on every recomposition / layout pass. [Rich] is immutable. */
+/**
+ * Small LRU: the same question HTML is parsed again on every recomposition / layout pass. [Rich] is immutable.
+ * Html that carries pictures (base64 data URLs, hundreds of KB) changes on every keystroke, so it must NOT go into the
+ * 600-entry cache: hundreds of such strings (plus their parsed copies) fill the heap and the app dies with an
+ * OutOfMemoryError while the person types. Big html gets its own tiny cache instead.
+ */
+private const val PARSE_CACHE_MAX_HTML = 8_000
+private const val PARSE_BIG_ENTRIES = 4
+
 private val parseCache = object : LinkedHashMap<String, Rich>(256, 0.75f, true) {
     override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Rich>?): Boolean = size > 600
 }
 
+private val parseBigCache = object : LinkedHashMap<String, Rich>(8, 0.75f, true) {
+    override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Rich>?): Boolean = size > PARSE_BIG_ENTRIES
+}
+
 fun parseHtml(html: String): Rich {
     if (html.length < 12) return parseHtmlUncached(html)
-    synchronized(parseCache) { parseCache[html]?.let { return it } }
+    val cache = if (html.length > PARSE_CACHE_MAX_HTML) parseBigCache else parseCache
+    synchronized(cache) { cache[html]?.let { return it } }
     val r = parseHtmlUncached(html)
-    synchronized(parseCache) { parseCache[html] = r }
+    synchronized(cache) { cache[html] = r }
     return r
 }
 

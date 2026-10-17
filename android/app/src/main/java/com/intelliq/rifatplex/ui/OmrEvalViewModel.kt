@@ -124,7 +124,7 @@ internal class OmrEvalViewModel : ViewModel() {
             val p = app.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             marksText = p.getString("marks", "") ?: ""
             negText = p.getString("neg", "") ?: ""
-            penalizeMulti = p.getBoolean("multi", false)
+            penalizeMulti = false // the option is gone from the screen: two marks in one row always get 0 and go to review
         }
     }
 

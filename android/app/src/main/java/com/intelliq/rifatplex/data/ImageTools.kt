@@ -154,7 +154,13 @@ object ImageTools {
     fun fromBitmap(bmp: Bitmap): Pic = compressJpeg(bmp, 1000, 0.86f, 260000, 0.82f)
 
     /** Crop. [fx] [fy] [fw] [fh] are fractions (0..1) of the picture. The result is a JPEG, longest side 1400 px. */
-    fun crop(pic: Pic, fx: Float, fy: Float, fw: Float, fh: Float): Pic? {
+    fun crop(pic: Pic, fx: Float, fy: Float, fw: Float, fh: Float): Pic? = try {
+        cropUnsafe(pic, fx, fy, fw, fh)
+    } catch (e: Throwable) {
+        null // out of memory / bad pixels: the dialog just closes, the app must not die
+    }
+
+    private fun cropUnsafe(pic: Pic, fx: Float, fy: Float, fw: Float, fh: Float): Pic? {
         val bmp = decode(pic.url) ?: return null
         val bw = bmp.width
         val bh = bmp.height
@@ -167,7 +173,13 @@ object ImageTools {
     }
 
     /** Crop for the institution logo: stays a PNG, so a transparent logo is not put on a white box. */
-    fun cropLogo(pic: Pic, fx: Float, fy: Float, fw: Float, fh: Float): Pic? {
+    fun cropLogo(pic: Pic, fx: Float, fy: Float, fw: Float, fh: Float): Pic? = try {
+        cropLogoUnsafe(pic, fx, fy, fw, fh)
+    } catch (e: Throwable) {
+        null
+    }
+
+    private fun cropLogoUnsafe(pic: Pic, fx: Float, fy: Float, fw: Float, fh: Float): Pic? {
         val bmp = decode(pic.url) ?: return null
         val bw = bmp.width
         val bh = bmp.height
@@ -312,7 +324,13 @@ object ImageTools {
     }
 
     /** Final cleaned picture: PNG when transparent, JPEG otherwise; shrunk (5 tries) when above about 330 KB. */
-    fun cleanFinish(d: CleanData, level: Int, transparent: Boolean): Pic {
+    fun cleanFinish(d: CleanData, level: Int, transparent: Boolean): Pic? = try {
+        cleanFinishUnsafe(d, level, transparent)
+    } catch (e: Throwable) {
+        null
+    }
+
+    private fun cleanFinishUnsafe(d: CleanData, level: Int, transparent: Boolean): Pic {
         var bmp = cleanRender(d, level, transparent)
         var url = toUrl(bmp, transparent, 90)
         var t = 0

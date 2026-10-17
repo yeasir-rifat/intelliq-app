@@ -38,6 +38,7 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -409,7 +410,10 @@ class RichEditorState(html: String) : RichHandle {
             if (styles.size == tfv.text.length && isAtomAt(tfv.text, styles, i)) {
                 val l = atomChip(styles[i], figLines).length
                 val ts = i + delta
-                for (j in ts until minOf(ts + l, len)) if (layout.getBoundingBox(j).contains(p)) return i
+                for (j in ts until minOf(ts + l, len)) {
+                    val hit = try { layout.getBoundingBox(j).contains(p) } catch (e: RuntimeException) { false }
+                    if (hit) return i
+                }
                 delta += l - 1
             }
         }
@@ -518,6 +522,7 @@ fun RichEditor(
         if (f === selFig) h += with(density) { 6.dp.toPx() } + barH
         kotlin.math.ceil(h / lineH).toInt() + 2
     }
+    val figLinesNow by rememberUpdatedState(figLines)
     val vt = VisualTransformation { t -> editorTransformed(t.text, styles, 0.75f, chipFg, chipBg, figLines) }
     var layout by remember { mutableStateOf<TextLayoutResult?>(null) }
     val padX = with(LocalDensity.current) { 12.dp.toPx() }
@@ -547,7 +552,7 @@ fun RichEditor(
         modifier = modifier.fillMaxWidth().pointerInput(Unit) {
             detectTapGestures { pos ->
                 val l = layout ?: return@detectTapGestures
-                state.hitAtom(Offset(pos.x - padX, pos.y - padY), l, figLines)?.let { state.editAtomAt(it) }
+                state.hitAtom(Offset(pos.x - padX, pos.y - padY), l, { f -> figLinesNow(f) })?.let { state.editAtomAt(it) }
             }
         }.onFocusChanged {
             focused = it.isFocused
