@@ -120,7 +120,7 @@ internal fun OmrEvalSection(d: AppData) {
         exporting = true
         exportMsg = null
         val snapshot = vm.sheets.toList()
-        val title = d.doc.title.trim().ifEmpty { tr("eval.pdf.defaultTitle") }
+        val title = d.doc.title.trim().ifEmpty { trKey("eval.pdf.defaultTitle", lang) }
         scope.launch {
             try {
                 val stamp = SimpleDateFormat("yyyyMMdd_HHmm", Locale.US).format(Date())
@@ -134,10 +134,10 @@ internal fun OmrEvalSection(d: AppData) {
                 }
                 val saved = PdfExport.deliver(ctx.findComponentActivity(), r)
                 exportErr = false
-                exportMsg = tr(if (saved) "eval.exported" else "eval.shared").replace("{f}", r.fileName)
+                exportMsg = trKey(if (saved) "eval.exported" else "eval.shared", lang).replace("{f}", r.fileName)
             } catch (e: Exception) {
                 exportErr = true
-                exportMsg = tr("eval.exportFail")
+                exportMsg = trKey("eval.exportFail", lang)
             } finally {
                 exporting = false
             }
