@@ -149,6 +149,38 @@ class HistoryStore(context: Context) {
         sync?.entryChanged(entry)
     }
 
+    /**
+     * Continuous autosave of the paper being edited. The saved copy is found by its exam id, so typing a new title
+     * updates the same entry instead of adding one per keystroke. Nothing is written when nothing changed (so just
+     * opening a saved paper does not move it to the top), and a document without a question is never saved.
+     */
+    @Synchronized
+    fun autosave(d: AppData) {
+        ensureLoaded()
+        if (d.questions.none { !it.isEmpty() }) return
+        val idx = entries.indexOfFirst { it.state.examId == d.examId }
+        if (idx < 0) {
+            record(d)
+            return
+        }
+        val old = entries[idx]
+        val clean = d.copy(ai = AiSettings(), dark = old.state.dark, zoom = old.state.zoom)
+        if (old.state == clean) return
+        val entry = old.copy(
+            title = d.doc.title.trim(),
+            subtitle = d.doc.subtitle.trim(),
+            folderId = d.folderId,
+            language = d.language,
+            questionCount = d.questions.count { !it.isEmpty() },
+            updatedAt = System.currentTimeMillis(),
+            hasAnswerKey = d.hasAnswerKey(),
+            state = d.copy(ai = AiSettings()),
+        )
+        entries = listOf(entry) + entries.filterIndexed { i, _ -> i != idx }
+        saveEntries()
+        sync?.entryChanged(entry)
+    }
+
     @Synchronized
     fun delete(id: String) {
         ensureLoaded()

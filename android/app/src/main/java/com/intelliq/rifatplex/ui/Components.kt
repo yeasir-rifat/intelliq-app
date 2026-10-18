@@ -33,7 +33,6 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -115,6 +114,7 @@ fun InputBox(
         value = value,
         onValueChange = onChange,
         textStyle = TextStyle(fontSize = 14.sp, color = c.text, fontFamily = family),
+        visualTransformation = if (family === com.intelliq.rifatplex.ui.theme.NotoSerifBengali) LatinVisualTransformation else androidx.compose.ui.text.input.VisualTransformation.None,
         cursorBrush = SolidColor(c.primary),
         singleLine = singleLine,
         keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
@@ -242,7 +242,7 @@ fun IQButton(text: String, kind: BtnKind, modifier: Modifier = Modifier, onClick
             .padding(horizontal = 16.dp, vertical = 8.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Text(text, color = fg, fontSize = 14.sp, fontWeight = FontWeight.Medium, fontFamily = uiFont())
+        Text(text, color = fg, fontSize = 14.sp, fontWeight = FontWeight.Medium, fontFamily = uiFont(), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
     }
 }
 

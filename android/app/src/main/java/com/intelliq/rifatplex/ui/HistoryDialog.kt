@@ -20,7 +20,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -136,7 +135,7 @@ fun HistoryModal(
                         Icon(PIcons.Inbox, null, Modifier.size(24.dp), tint = c.primary)
                     }
                     Text(tr("history.emptyTitle"), color = c.text, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, fontFamily = uiFont())
-                    Text(tr("history.emptySub"), color = c.textFaint, fontSize = 13.sp, fontFamily = uiFont())
+                    Text(tr("history.emptySub"), color = c.textFaint, fontSize = 13.sp, fontFamily = uiFont(), textAlign = androidx.compose.ui.text.style.TextAlign.Center, modifier = Modifier.fillMaxWidth())
                 }
             } else {
                 Column(

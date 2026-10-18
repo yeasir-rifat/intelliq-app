@@ -25,7 +25,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -85,16 +84,7 @@ fun LabeledBlock(
             .fillMaxWidth()
             .clip(shape)
             .background(c.success.copy(alpha = 0.06f))
-            .drawBehind {
-                drawRoundRect(
-                    color = c.successInk,
-                    cornerRadius = CornerRadius(4.dp.toPx()),
-                    style = Stroke(
-                        width = 1.dp.toPx(),
-                        pathEffect = PathEffect.dashPathEffect(floatArrayOf(4.dp.toPx(), 3.dp.toPx())),
-                    ),
-                )
-            }
+            .dashedBorder(c.successInk, radius = 8.dp, width = 1.dp, dash = 4.dp, gap = 3.dp)
             .padding(start = 10.dp, end = 10.dp, top = 8.dp, bottom = 10.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {

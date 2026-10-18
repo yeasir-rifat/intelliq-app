@@ -248,17 +248,17 @@ object PdfExport {
     }
 
     /**
-     * Saves into Downloads/IntelliQ (Android 10+). On Android 8/9, where that needs a storage permission,
+     * Saves into Downloads/IntelliQ (or Downloads/IntelliQ/[subFolder]) (Android 10+). On Android 8/9, where that needs a storage permission,
      * the file is handed to the share sheet instead. Returns true when it was saved to Downloads.
      */
-    suspend fun deliver(activity: Activity, r: ExportResult): Boolean {
+    suspend fun deliver(activity: Activity, r: ExportResult, subFolder: String? = null): Boolean {
         if (Build.VERSION.SDK_INT >= 29) {
             withContext(Dispatchers.IO) {
                 val resolver = activity.contentResolver
                 val values = ContentValues().apply {
                     put(MediaStore.Downloads.DISPLAY_NAME, r.fileName)
                     put(MediaStore.Downloads.MIME_TYPE, r.mime)
-                    put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/IntelliQ")
+                    put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/IntelliQ" + (if (subFolder != null) "/$subFolder" else ""))
                     put(MediaStore.Downloads.IS_PENDING, 1)
                 }
                 val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)

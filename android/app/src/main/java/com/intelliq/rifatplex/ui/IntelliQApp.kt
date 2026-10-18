@@ -65,9 +65,9 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
@@ -120,7 +120,12 @@ import com.intelliq.rifatplex.ui.theme.NotoSerifBengali
 import com.intelliq.rifatplex.ui.theme.Poppins
 import com.intelliq.rifatplex.ui.theme.Lato
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @Composable
 fun IntelliQApp(store: AppStore, ai: AiViewModel, aiEdit: AiEditViewModel) {
@@ -149,9 +154,29 @@ fun IntelliQApp(store: AppStore, ai: AiViewModel, aiEdit: AiEditViewModel) {
     val keys = remember { AnswerKeyStore.get(context) } // answer snapshots for the OMR check (step 4.3)
 
     // Google account = login + subscription only. Papers, folders, answer keys and the Gemini key never leave this phone
-    // (the user can send a backup to their own Gmail from the account dialog).
+    // (the user can save a backup file on the phone from the account dialog).
     LaunchedEffect(Unit) {
         cloud.start(ownerChanged = { store.updateAi { it.copy(apiKey = "") } })
+    }
+    // The phone's database is always up to date: the paper being edited is saved to History a moment after every
+    // change (and at once when the app goes to the background), so "Download Database" always has the latest.
+    LaunchedEffect(Unit) {
+        @OptIn(FlowPreview::class)
+        androidx.compose.runtime.snapshotFlow { store.data }
+            .drop(1)
+            .debounce(1500)
+            .collect { d -> withContext(Dispatchers.Default) { history.autosave(d) } }
+    }
+    DisposableEffect(activity) {
+        val owner = activity as? androidx.lifecycle.LifecycleOwner
+        val obs = androidx.lifecycle.LifecycleEventObserver { _, e ->
+            if (e == androidx.lifecycle.Lifecycle.Event.ON_STOP) {
+                store.flush()
+                history.autosave(store.data)
+            }
+        }
+        owner?.lifecycle?.addObserver(obs)
+        onDispose { owner?.lifecycle?.removeObserver(obs) }
     }
     var historyOpen by rememberSaveable { mutableStateOf(false) }
     // back button / gesture: close what is open first, then go from Preview to Input; only then leave the app
@@ -802,19 +827,12 @@ private fun InputPanel(
 private fun EmptyHint() {
     val c = IQ.c
     val line = c.borderStrong
-    val dash = with(LocalDensity.current) { 6.dp.toPx() }
-    val corner = with(LocalDensity.current) { 12.dp.toPx() }
     Column(
         Modifier
             .padding(bottom = 12.dp)
             .fillMaxWidth()
             .clip(IQD.card)
-            .drawBehind {
-                drawRoundRect(
-                    line, cornerRadius = CornerRadius(corner),
-                    style = Stroke(1.5.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(dash, dash))),
-                )
-            }
+            .dashedBorder(line, radius = 12.dp, width = 1.5.dp, dash = 6.dp, gap = 6.dp)
             .padding(horizontal = 20.dp, vertical = 22.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(8.dp),

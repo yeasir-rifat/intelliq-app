@@ -40,7 +40,7 @@ internal val OB_EN = mapOf(
     "ob.p4.title" to "Your Data Stays on Your Phone",
     "ob.p4.sub" to "Private by design.",
     "ob.p4.a" to "Strong Privacy & Security",
-    "ob.p4.b" to "Local Storage & Cloud Backup",
+    "ob.p4.b" to "Local Storage & Database Backup",
     "ob.p4.c" to "100% Brand Representation",
     "ob.p4.d" to "Pixel-Perfect PDF & OMR Sheet",
 )
@@ -81,7 +81,7 @@ internal val OB_BN = mapOf(
     "ob.p4.title" to "আপনার ডাটা থাকবে আপনার ফোনেই",
     "ob.p4.sub" to "গোপনীয়তা সবার আগে।",
     "ob.p4.a" to "শক্তিশালী প্রাইভেসি ও সিকিউরিটি",
-    "ob.p4.b" to "লোকাল স্টোরেজ ও ক্লাউড ব্যাকআপ",
+    "ob.p4.b" to "লোকাল স্টোরেজ ও ডাটাবেজ ব্যাকআপ",
     "ob.p4.c" to "১০০% ব্র্যান্ড উপস্থাপনা",
     "ob.p4.d" to "পিক্সেল-পারফেক্ট PDF ও OMR শিট",
 )

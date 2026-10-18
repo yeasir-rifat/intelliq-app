@@ -16,7 +16,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -28,7 +30,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -43,7 +44,12 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.DrawScope
@@ -147,6 +153,37 @@ internal fun OmrEvalSection(d: AppData) {
                     } else {
                         ExportResult("OMR_Results_$stamp.pdf", "application/pdf", OmrResultPdf.build(ctx, snapshot, layout, lang), false)
                     }
+                }
+                val saved = PdfExport.deliver(ctx.findComponentActivity(), r)
+                exportErr = false
+                exportMsg = trKey(if (saved) "eval.exported" else "eval.shared", lang).replace("{f}", r.fileName)
+            } catch (e: Exception) {
+                exportErr = true
+                exportMsg = trKey("eval.exportFail", lang)
+            } finally {
+                exporting = false
+            }
+        }
+    }
+
+    /** The ranked "Report PDF": every marked sheet in rank order, with the summary and the top three. */
+    fun exportReport() {
+        if (exporting || vm.sheets.isEmpty()) return
+        val snapshot = vm.sheets.toList()
+        if (!OmrReportPdf.hasRows(snapshot)) {
+            exportErr = true
+            exportMsg = trKey("eval.pdf.none", lang)
+            return
+        }
+        exporting = true
+        exportMsg = null
+        val title = d.doc.title
+        val sub = d.doc.subjectLine()
+        scope.launch {
+            try {
+                val stamp = SimpleDateFormat("yyyyMMdd_HHmm", Locale.US).format(Date())
+                val r = withContext(Dispatchers.Default) {
+                    ExportResult("OMR_Report_$stamp.pdf", "application/pdf", OmrReportPdf.build(ctx, snapshot, title, sub, lang), false)
                 }
                 val saved = PdfExport.deliver(ctx.findComponentActivity(), r)
                 exportErr = false
@@ -293,6 +330,7 @@ internal fun OmrEvalSection(d: AppData) {
                     IQButton(tr(if (exporting) "eval.exporting" else "eval.exportPdf"), BtnKind.Primary, Modifier.weight(1f).alpha(if (exporting) 0.5f else 1f)) { export(false) }
                     IQButton(tr("eval.downloadAll"), BtnKind.Secondary, Modifier.weight(1f).alpha(if (exporting) 0.5f else 1f)) { export(true) }
                 }
+                IQButton(tr("eval.rep.btn"), BtnKind.Secondary, Modifier.fillMaxWidth().alpha(if (exporting) 0.5f else 1f)) { exportReport() }
                 val em = exportMsg
                 if (em != null) Text(em, color = if (exportErr) c.danger else c.successInk, fontSize = 13.sp, fontFamily = uiFont())
                 Text(
@@ -342,10 +380,10 @@ internal fun OmrEvalSection(d: AppData) {
 private fun KeyImportPanel(vm: OmrEvalViewModel, bn: Boolean, onCamera: () -> Unit, onGallery: () -> Unit, onPdf: () -> Unit) {
     val c = IQ.c
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            IQButton(tr("scan.camera"), BtnKind.Secondary, Modifier.weight(1f)) { onCamera() }
-            IQButton(tr("scan.gallery"), BtnKind.Secondary, Modifier.weight(1f)) { onGallery() }
-            IQButton("PDF", BtnKind.Secondary, Modifier.weight(1f)) { onPdf() }
+        Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            IQButton(tr("keyimp.cam"), BtnKind.Secondary, Modifier.weight(1f).fillMaxHeight()) { onCamera() }
+            IQButton(tr("keyimp.gal"), BtnKind.Secondary, Modifier.weight(1f).fillMaxHeight()) { onGallery() }
+            IQButton("PDF", BtnKind.Secondary, Modifier.weight(1f).fillMaxHeight()) { onPdf() }
         }
         if (vm.keyBusy > 0) {
             Text(tr("keyimp.working"), color = c.primary, fontSize = 13.sp, fontWeight = FontWeight.Medium, fontFamily = uiFont())
@@ -558,40 +596,79 @@ private fun StatChip(value: String, label: String, color: Color, modifier: Modif
     }
 }
 
+/** Score as a ring: the arc is score / total, the number sits in the middle. */
+@Composable
+private fun ScoreRing(score: Double, total: Double, color: Color, diameter: Dp, bn: Boolean, scoreSp: Int, totalSp: Int) {
+    val frac = if (total > 0.0) (score / total).coerceIn(0.0, 1.0).toFloat() else 0f
+    Box(Modifier.size(diameter), contentAlignment = Alignment.Center) {
+        Canvas(Modifier.matchParentSize()) {
+            val sw = diameter.toPx() * 0.11f
+            val inset = sw / 2f
+            val arc = Size(size.width - sw, size.height - sw)
+            drawArc(color.copy(alpha = 0.16f), 0f, 360f, false, Offset(inset, inset), arc, style = Stroke(sw))
+            if (frac > 0f) drawArc(color, -90f, 360f * frac, false, Offset(inset, inset), arc, style = Stroke(sw, cap = StrokeCap.Round))
+        }
+        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy((-2).dp)) {
+            Text(fmt(score, bn), color = color, fontSize = scoreSp.sp, fontWeight = FontWeight.Bold, fontFamily = uiFont(), maxLines = 1)
+            Text("/ " + fmt(total, bn), color = IQ.c.textFaint, fontSize = totalSp.sp, fontFamily = uiFont(), maxLines = 1)
+        }
+    }
+}
+
+@Composable
+private fun StatePill(text: String, color: Color) {
+    Row(
+        Modifier.clip(CircleShape).background(color.copy(alpha = 0.14f)).padding(horizontal = 10.dp, vertical = 3.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.size(6.dp).clip(CircleShape).background(color))
+        Text(text, color = color, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, fontFamily = uiFont(), maxLines = 1)
+    }
+}
+
+@Composable
+private fun StateTile(state: EvalState, color: Color, tile: Dp) {
+    Box(
+        Modifier.size(tile).clip(RoundedCornerShape(13.dp))
+            .background(Brush.linearGradient(listOf(color, color.copy(alpha = 0.70f)))),
+        contentAlignment = Alignment.Center,
+    ) {
+        val ic = when (state) {
+            EvalState.OK -> PIcons.Check
+            EvalState.FAILED -> PIcons.Close
+            else -> PIcons.ErrorCircle
+        }
+        Icon(ic, tr("eval.state." + state.name), Modifier.size(tile * 0.5f), tint = Color.White)
+    }
+}
+
 @Composable
 private fun SheetCard(s: EvalSheet, bn: Boolean, onOpen: () -> Unit) {
     val c = IQ.c
     val col = stateColor(s.state)
     val res = s.result
+    val shape = RoundedCornerShape(16.dp)
     Row(
         Modifier
             .fillMaxWidth()
-            .clip(IQD.card)
-            .background(c.field)
-            .border(1.dp, if (s.state == EvalState.OK) c.success else c.border, IQD.card)
+            .clip(shape)
+            .background(Brush.horizontalGradient(listOf(col.copy(alpha = 0.13f), c.field, c.field)))
+            .border(1.dp, col.copy(alpha = 0.38f), shape)
             .clickable { onOpen() }
-            .padding(12.dp),
+            .padding(horizontal = 12.dp, vertical = 12.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(Modifier.size(34.dp).clip(CircleShape).background(col.copy(alpha = 0.14f)), contentAlignment = Alignment.Center) {
-            val ic = when (s.state) {
-                EvalState.OK -> PIcons.Check
-                EvalState.FAILED -> PIcons.Close
-                else -> PIcons.ErrorCircle
-            }
-            Icon(ic, tr("eval.state." + s.state.name), Modifier.size(18.dp), tint = col)
-        }
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(sheetLine(s, bn), color = c.text, fontSize = 14.sp, fontWeight = FontWeight.Medium, fontFamily = uiFont())
-            Text(tr("eval.state." + s.state.name), color = col, fontSize = 12.sp, fontWeight = FontWeight.Medium, fontFamily = uiFont())
-        }
-        if (res != null) {
+        StateTile(s.state, col, 42.dp)
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
             Text(
-                fmt(res.score, bn) + " / " + fmt(res.total, bn),
-                color = col, fontSize = 17.sp, fontWeight = FontWeight.Bold, fontFamily = uiFont(),
+                sheetLine(s, bn), color = c.text, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, fontFamily = uiFont(),
+                maxLines = 2, overflow = TextOverflow.Ellipsis,
             )
+            StatePill(tr("eval.state." + s.state.name), col)
         }
+        if (res != null) ScoreRing(res.score, res.total, col, 58.dp, bn, 14, 10)
     }
 }
 
@@ -607,30 +684,45 @@ private fun EvalDetail(vm: OmrEvalViewModel, s: EvalSheet, bn: Boolean, onClose:
                 .fillMaxWidth()
                 .clip(IQD.dialog)
                 .background(c.panel)
+                .border(1.dp, c.glassBorder, IQD.dialog)
                 .verticalScroll(rememberScrollState())
                 .padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Text(s.name, color = c.text, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, fontFamily = uiFont())
-            Text(tr("eval.state." + s.state.name), color = stateColor(s.state), fontSize = 13.sp, fontWeight = FontWeight.Medium, fontFamily = uiFont())
+            val col = stateColor(s.state)
+            val hShape = RoundedCornerShape(16.dp)
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .clip(hShape)
+                    .background(Brush.linearGradient(listOf(col.copy(alpha = 0.20f), c.primary.copy(alpha = 0.08f))))
+                    .border(1.dp, col.copy(alpha = 0.38f), hShape)
+                    .padding(14.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(s.name, color = c.text, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, fontFamily = uiFont(), maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    StatePill(tr("eval.state." + s.state.name), col)
+                }
+                if (res != null) ScoreRing(res.score, res.total, col, 78.dp, bn, 20, 12)
+                else StateTile(s.state, col, 48.dp)
+            }
 
             if (res != null) {
-                Text(
-                    tr("eval.score").replace("{s}", fmt(res.score, bn)).replace("{t}", fmt(res.total, bn)),
-                    color = c.text, fontSize = 18.sp, fontWeight = FontWeight.Bold, fontFamily = uiFont(),
-                )
-                Text(
-                    tr("eval.counts")
-                        .replace("{a}", formatNumber(res.correct, bn)).replace("{b}", formatNumber(res.wrong, bn))
-                        .replace("{c}", formatNumber(res.blank, bn)).replace("{u}", formatNumber(res.review.size, bn)),
-                    color = c.textSecondary, fontSize = 13.sp, fontFamily = uiFont(),
-                )
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    StatChip(formatNumber(res.correct, bn), tr("eval.c.right"), c.successInk, Modifier.weight(1f))
+                    StatChip(formatNumber(res.wrong, bn), tr("eval.c.wrong"), c.danger, Modifier.weight(1f))
+                    StatChip(formatNumber(res.blank, bn), tr("eval.c.blank"), c.textSecondary, Modifier.weight(1f))
+                    StatChip(formatNumber(res.review.size, bn), tr("eval.c.check"), AMBER, Modifier.weight(1f))
+                }
                 Text(
                     tr("eval.calc")
                         .replace("{a}", formatNumber(res.correct, bn)).replace("{m}", fmt(res.marksPerQ, bn))
                         .replace("{w}", formatNumber(res.rows.count { it.delta < 0.0 }, bn)).replace("{n}", fmt(res.negativePerWrong, bn))
                         .replace("{s}", fmt(res.score, bn)),
-                    color = c.textFaint, fontSize = 12.sp, fontFamily = uiFont(),
+                    color = c.textFaint, fontSize = 12.sp, fontFamily = uiFont(), textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth(),
                 )
             } else if (s.state == EvalState.FAILED) {
                 Text(tr(s.failKey ?: "scan.err.read"), color = c.danger, fontSize = 13.sp, fontFamily = uiFont())
@@ -665,13 +757,21 @@ private fun EvalDetail(vm: OmrEvalViewModel, s: EvalSheet, bn: Boolean, onClose:
                         Modifier
                             .fillMaxWidth()
                             .aspectRatio(s.imgW.toFloat() / s.imgH.toFloat())
-                            .clip(RoundedCornerShape(8.dp)),
+                            .clip(RoundedCornerShape(12.dp))
+                            .border(1.dp, c.borderStrong, RoundedCornerShape(12.dp)),
                     ) {
                         Image(bmp, null, Modifier.matchParentSize(), contentScale = ContentScale.FillBounds)
                         val al = s.align
                         if (al != null) Canvas(Modifier.matchParentSize()) { drawResult(al, res?.rows ?: emptyList(), size.width / s.imgW) }
                     }
-                    if (res != null) Text(tr("eval.legend"), color = c.textFaint, fontSize = 12.sp, fontFamily = uiFont())
+                    if (res != null) Row(
+                        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(c.primarySoft).padding(10.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.Top,
+                    ) {
+                        Icon(PIcons.Info, null, Modifier.size(16.dp), tint = c.primaryInk)
+                        Text(tr("eval.legend"), color = c.textSecondary, fontSize = 12.sp, fontFamily = uiFont(), modifier = Modifier.weight(1f))
+                    }
                 }
             }
 

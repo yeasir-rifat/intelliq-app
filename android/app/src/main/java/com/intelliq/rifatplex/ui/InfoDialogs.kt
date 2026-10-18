@@ -23,7 +23,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -244,7 +243,7 @@ fun AccountDialog(
     var hintError by remember { mutableStateOf(false) }
     var working by remember { mutableStateOf(false) }
 
-    // Restore: the user picks the backup .zip (e.g. the attachment saved from their Gmail). It is MERGED into the phone's data.
+    // Restore: the user picks the backup .zip saved on this phone. It is MERGED into the phone's data.
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
             working = true
@@ -265,32 +264,29 @@ fun AccountDialog(
         }
     }
 
-    // Backup: build the zip, then open the Gmail app with it attached, addressed to the user's own address.
-    fun sendBackup(email: String) {
+    // Backup: build the zip and save it on this phone (Downloads/IntelliQ). Nothing is sent anywhere.
+    fun saveBackup(email: String) {
         if (working) return
         working = true
         scope.launch {
-            val r = withContext(Dispatchers.IO) { Backup.create(ctx, email) }
-            working = false
+            val r = withContext(Dispatchers.IO) { Backup.create(ctx, email, asJson = true) }
             when (r) {
                 BackupResult.Empty -> onToast(trKey("backup.empty", lang), true)
                 BackupResult.Failed -> onToast(trKey("backup.failed", lang), true)
                 is BackupResult.Ready -> {
-                    val body = trKey("backup.body", lang).replace("{p}", r.papers.toString())
-                        .replace("{f}", r.folders.toString()).replace("{k}", r.keys.toString())
-                    com.intelliq.rifatplex.data.BackupReminderStore.get(ctx).markBackedUp()
-                    val send = Backup.sendIntent(ctx, r.file, email, trKey("backup.subject", lang), body)
                     try {
-                        ctx.startActivity(Intent(send).setPackage(Backup.GMAIL_PACKAGE))
-                    } catch (e: ActivityNotFoundException) {
-                        try {
-                            ctx.startActivity(Intent.createChooser(send, trKey("backup.gmailBtn", lang)))
-                        } catch (e2: ActivityNotFoundException) {
-                            onToast(trKey("backup.noMail", lang), true)
-                        }
+                        val bytes = withContext(Dispatchers.IO) { r.file.readBytes() }
+                        val stamp = java.text.SimpleDateFormat("yyyy-MM-dd_HH-mm", java.util.Locale.US).format(java.util.Date())
+                        val name = "intelliq_backup_$stamp.json"
+                        val saved = PdfExport.deliver(activity, ExportResult(name, "application/json", bytes, false), "Downloaded Database")
+                        com.intelliq.rifatplex.data.BackupReminderStore.get(ctx).markBackedUp()
+                        if (saved) onToast(trKey("backup.saved", lang), false)
+                    } catch (e: Exception) {
+                        onToast(trKey("backup.failed", lang), true)
                     }
                 }
             }
+            working = false
         }
     }
     Dialog(onDismissRequest = onDismiss) {
@@ -357,19 +353,11 @@ fun AccountDialog(
                         Text(user.email, color = c.textSecondary, fontSize = 14.sp, fontFamily = uiFont(), textAlign = TextAlign.Center)
                     }
                     Text(tr("account.syncOn"), color = c.successInk, fontSize = 13.sp, fontWeight = FontWeight.Medium, fontFamily = uiFont())
-                    Text(
-                        tr("account.appOnly"), color = c.textFaint, fontSize = 13.sp, lineHeight = 20.sp,
-                        textAlign = TextAlign.Center, fontFamily = uiFont(),
-                    )
                     Text(tr("backup.title"), color = c.text, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, fontFamily = uiFont())
-                    Text(
-                        tr("backup.note"), color = c.textFaint, fontSize = 13.sp, lineHeight = 20.sp,
-                        textAlign = TextAlign.Center, fontFamily = uiFont(),
-                    )
                     IQButton(
-                        if (working) tr("backup.working") else tr("backup.gmailBtn"),
+                        if (working) tr("backup.working") else tr("backup.phoneBtn"),
                         BtnKind.Secondary, Modifier.fillMaxWidth(),
-                    ) { sendBackup(user.email) }
+                    ) { saveBackup(user.email) }
                     IQButton(tr("backup.restoreBtn"), BtnKind.Secondary, Modifier.fillMaxWidth()) {
                         if (!working) picker.launch(arrayOf("*/*"))
                     }

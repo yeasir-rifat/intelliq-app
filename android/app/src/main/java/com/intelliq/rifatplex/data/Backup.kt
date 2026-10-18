@@ -36,8 +36,8 @@ sealed class RestoreResult {
 
 /**
  * The user's own backup. Saved papers, folders and answer-key snapshots live ONLY on this phone; nothing is uploaded to
- * Firebase. When the user asks, they are packed into one .zip (a single backup.json inside) and handed to the Gmail app,
- * addressed to the user's own address. The user presses Send, so the copy sits in their mailbox, not on any server of ours.
+ * Firebase. When the user asks, they are packed into one .zip (a single backup.json inside) and saved on the phone
+ * (Downloads/IntelliQ). Nothing is sent anywhere.
  * Restore reads such a .zip (or a plain .json) and MERGES it: nothing on the phone is deleted, a paper or answer key
  * from the file only replaces the local one when it is newer.
  *
@@ -153,7 +153,7 @@ object Backup {
     }
 
     /** Builds the file in the cache folder (old backup files there are removed). Runs on a background thread. */
-    fun create(context: Context, email: String): BackupResult = try {
+    fun create(context: Context, email: String, asJson: Boolean = false): BackupResult = try {
         val history = HistoryStore.get(context)
         val keys = AnswerKeyStore.get(context)
         history.awaitLoaded()
@@ -163,11 +163,12 @@ object Backup {
         if (papers == 0 && folders == 0 && keyCount == 0) BackupResult.Empty
         else {
             val now = System.currentTimeMillis()
-            val bytes = zip(toJson(history, keys, email, now))
+            val json = toJson(history, keys, email, now)
+            val bytes = if (asJson) json.toByteArray(Charsets.UTF_8) else zip(json)
             val dir = File(context.cacheDir, "backups").apply { mkdirs() }
             dir.listFiles()?.forEach { it.delete() }
             val stamp = SimpleDateFormat("yyyy-MM-dd-HHmm", Locale.US).format(Date(now))
-            val f = File(dir, "intelliq-backup-$stamp.zip")
+            val f = File(dir, "intelliq-backup-$stamp." + (if (asJson) "json" else "zip"))
             f.writeBytes(bytes)
             BackupResult.Ready(f, papers, folders, keyCount)
         }
