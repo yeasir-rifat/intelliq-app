@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Downloads the Google Fonts the app uses (+ metric-compatible stand-ins for
-# Times New Roman / Calibri / Cambria) and bundles them into the app.
+# Downloads the Google Fonts the app uses and bundles them into the app.
 #   App UI:  English = Lato, Bangla = Noto Serif Bengali
-#   PDF:     Bangla = Kalpurush (committed in res/font, OFL), English = Tinos (Times New Roman metrics),
-#            formulas = Caladea (Cambria metrics)
+#   PDF:     English = Times New Roman | Georgia | Cambria (committed in res/font)
+#            Bangla  = Noto Serif Bengali | Nikosh | Kalpurush | SolaimanLipi | AdorshoLipi
+#            formulas = Cambria, chosen automatically
 set -uo pipefail
 D="$(cd "$(dirname "$0")" && pwd)/../app/src/main/res/font"
 mkdir -p "$D"
@@ -43,25 +43,29 @@ done
 get "$B/notoserifbengali/NotoSerifBengali%5Bwdth%2Cwght%5D.ttf" noto_serif_bengali.ttf
 fallback noto_serif_bengali.ttf hind_siliguri_regular.ttf
 
-# Kalpurush and SolaimanLipi (Settings -> Font Family) are committed in res/font, nothing to fetch.
+# Kalpurush and SolaimanLipi (Settings -> Bangla Font) are committed in res/font, nothing to fetch.
 
-# Paper fonts: Tinos ~ Times New Roman, Carlito ~ Calibri, Caladea ~ Cambria
-get "$B/tinos/Tinos-Regular.ttf"     tinos_regular.ttf
-get "$B/tinos/Tinos-Bold.ttf"        tinos_bold.ttf
-get "$B/tinos/Tinos-Italic.ttf"      tinos_italic.ttf
-get "$B/tinos/Tinos-BoldItalic.ttf"  tinos_bolditalic.ttf
+# Paper font: Carlito ~ Calibri
 get "$B/carlito/Carlito-Regular.ttf"     carlito_regular.ttf
 get "$B/carlito/Carlito-Bold.ttf"        carlito_bold.ttf
 get "$B/carlito/Carlito-Italic.ttf"      carlito_italic.ttf
 get "$B/carlito/Carlito-BoldItalic.ttf"  carlito_bolditalic.ttf
-get "$B/caladea/Caladea-Regular.ttf"     caladea_regular.ttf
-get "$B/caladea/Caladea-Bold.ttf"        caladea_bold.ttf
-get "$B/caladea/Caladea-Italic.ttf"      caladea_italic.ttf
-get "$B/caladea/Caladea-BoldItalic.ttf"  caladea_bolditalic.ttf
-for f in tinos carlito caladea; do
+for f in carlito; do
   fallback "${f}_regular.ttf" hind_siliguri_regular.ttf
   fallback "${f}_bold.ttf" hind_siliguri_bold.ttf
   fallback "${f}_italic.ttf" "${f}_regular.ttf"
   fallback "${f}_bolditalic.ttf" "${f}_bold.ttf"
 done
+
+# Times New Roman, Georgia and Cambria (Settings -> English Font) are committed in res/font (times_new_roman.ttf,
+# georgia_*.ttf, cambria.ttf), nothing to fetch. Times New Roman and Cambria have no bold/italic file: it is synthesised.
+
+# Nikosh and AdorshoLipi (Settings -> Bangla Font) are committed in res/font (nikosh.ttf, adorsho_lipi.ttf), so the
+# download below is skipped. It only runs if those files are ever removed; falls back to Kalpurush if it fails.
+G="https://github.com/hmoazzem/bangla-fonts/raw/master"
+get "$G/Nikosh.ttf"                    nikosh.ttf
+get "$G/AdorshoLipi_20-07-2007.ttf"    adorsho_lipi.ttf
+fallback nikosh.ttf kalpurush.ttf
+fallback adorsho_lipi.ttf kalpurush.ttf
+
 ls -la "$D"

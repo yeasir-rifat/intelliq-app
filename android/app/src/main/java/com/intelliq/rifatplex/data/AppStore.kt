@@ -251,7 +251,10 @@ class AppStore(context: Context) {
         if (language != null && language != d.language) {
             nd = nd.copy(
                 language = language,
-                settings = nd.settings.copy(fontFamily = if (language == "bn") "Kalpurush" else "Times New Roman"),
+                settings = nd.settings.copy(
+                    fontEn = "Times New Roman",
+                    fontBn = "Kalpurush",
+                ),
             )
         }
         if (meta != null) {

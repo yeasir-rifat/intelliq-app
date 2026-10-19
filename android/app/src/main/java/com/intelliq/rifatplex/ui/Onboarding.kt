@@ -86,7 +86,7 @@ import com.intelliq.rifatplex.ui.theme.IQ
 import com.intelliq.rifatplex.ui.theme.Lato
 import com.intelliq.rifatplex.ui.theme.PIcons
 import com.intelliq.rifatplex.ui.theme.Poppins
-import com.intelliq.rifatplex.ui.theme.SolaimanLipi
+import com.intelliq.rifatplex.ui.theme.NotoSerifBengali
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -269,9 +269,9 @@ private fun PrivacyPage(pager: PagerState) {
 
 /* ───────────── building blocks ───────────── */
 
-/** The intro always uses SolaimanLipi for Bangla and Lato for English. */
+/** The intro always uses Noto Serif Bengali for Bangla and Lato for English. */
 @Composable
-private fun obFont(): FontFamily = if (LocalLang.current == Lang.BN) SolaimanLipi else Lato
+private fun obFont(): FontFamily = if (LocalLang.current == Lang.BN) NotoSerifBengali else Lato
 
 /** Centres a page vertically; scrolls when the screen is too small (large font sizes, split screen). */
 @Composable
@@ -491,7 +491,7 @@ private fun LangPill(lang: Lang, onLang: (Lang) -> Unit) {
         Modifier.height(36.dp).clip(CircleShape).background(c.panel).border(1.dp, c.glassBorder, CircleShape).padding(3.dp),
     ) {
         LangSeg("EN", Lato, lang == Lang.EN) { onLang(Lang.EN) }
-        LangSeg("বাংলা", SolaimanLipi, lang == Lang.BN) { onLang(Lang.BN) }
+        LangSeg("বাংলা", NotoSerifBengali, lang == Lang.BN) { onLang(Lang.BN) }
     }
 }
 
@@ -610,7 +610,7 @@ private fun GlyphTile(glyph: Glyph, accent: Color, size: Dp, modifier: Modifier 
         if (glyph == Glyph.AA) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 val fs = (size.value * 0.34f).sp
-                Text("অ", color = Color.White, fontSize = fs, fontFamily = SolaimanLipi)
+                Text("অ", color = Color.White, fontSize = fs, fontFamily = NotoSerifBengali)
                 Text("A", color = Color.White, fontSize = fs, fontWeight = FontWeight.Bold, fontFamily = Lato)
             }
         } else {

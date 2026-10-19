@@ -8,7 +8,7 @@ package com.intelliq.rifatplex.data
  * resize things and break the measuring / evaluation. Nothing in [com.intelliq.rifatplex.data.DocSettings]
  * (fontFamily, fontSize, fontColor, pageColor) is read by either document any more.
  *
- * Fonts (see `sheetFonts` in ui/PaperFonts.kt): Bangla = SolaimanLipi, English = Times New Roman look (Tinos).
+ * Fonts (see `sheetFonts` in ui/PaperFonts.kt): Bangla = Kalpurush, English = Times New Roman, formulas = Cambria.
  * Page: white. Text colour: near-black.
  * Sizes: body 10 pt, heading 14 pt bold, sub-heading 12 pt bold.
  * Margin: 0.75 inch on all four sides.

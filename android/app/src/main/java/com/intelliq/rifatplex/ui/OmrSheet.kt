@@ -28,8 +28,8 @@ import com.intelliq.rifatplex.data.QrCode
 import com.intelliq.rifatplex.data.QrPayload
 import com.intelliq.rifatplex.data.formatNumber
 import com.intelliq.rifatplex.data.SheetStyle
-import com.intelliq.rifatplex.ui.theme.SolaimanLipi
-import com.intelliq.rifatplex.ui.theme.Tinos
+import com.intelliq.rifatplex.ui.theme.Kalpurush
+import com.intelliq.rifatplex.ui.theme.TimesNewRoman
 
 /*
  * OMR bubble sheet (A4), laid out like the SSC / HSC board answer sheet. Everything is drawn on ONE Canvas in
@@ -86,8 +86,8 @@ private fun rememberOmrFaces(): OmrFaces {
         fun face(f: FontFamily, w: FontWeight): Typeface =
             resolver.resolve(f, w, FontStyle.Normal, FontSynthesis.All).value as? Typeface ?: Typeface.DEFAULT
         OmrFaces(
-            face(SolaimanLipi, FontWeight.Normal), face(SolaimanLipi, FontWeight.Bold), // Bangla: fixed (SheetStyle)
-            face(Tinos, FontWeight.Normal), face(Tinos, FontWeight.Bold),
+            face(Kalpurush, FontWeight.Normal), face(Kalpurush, FontWeight.Bold), // Bangla: fixed (SheetStyle)
+            face(TimesNewRoman, FontWeight.Normal), face(TimesNewRoman, FontWeight.Bold),
         )
     }
 }

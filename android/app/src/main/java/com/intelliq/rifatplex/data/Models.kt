@@ -134,7 +134,8 @@ data class SectionMeta(val title: String = "", val instruction: String = "")
 data class DocSettings(
     val pageSize: String = "A4",
     val pageColor: String = "#FFFFFF",
-    val fontFamily: String = "Times New Roman",
+    val fontEn: String = "Times New Roman",        // English letters / digits: Times New Roman | Georgia | Cambria
+    val fontBn: String = "Kalpurush",              // Bangla: Noto Serif Bengali | Nikosh | Kalpurush | SolaimanLipi | AdorshoLipi
     val fontSize: Int = 10,
     val fontColor: String = "#111111",
     val chemAuto: Boolean = false, // auto-subscript digits in chemical formulas (H2O -> H₂O)

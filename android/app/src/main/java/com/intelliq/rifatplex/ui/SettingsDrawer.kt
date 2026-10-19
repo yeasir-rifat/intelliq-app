@@ -98,7 +98,8 @@ import com.intelliq.rifatplex.data.OMR_AUTO
 import com.intelliq.rifatplex.data.OMR_CUSTOM
 import androidx.activity.compose.BackHandler
 import com.intelliq.rifatplex.data.OmrSettings
-import com.intelliq.rifatplex.ui.theme.DOC_FONT_NAMES
+import com.intelliq.rifatplex.ui.theme.DOC_FONTS_BN
+import com.intelliq.rifatplex.ui.theme.DOC_FONTS_EN
 import com.intelliq.rifatplex.ui.theme.IQ
 import com.intelliq.rifatplex.ui.theme.Lato
 
@@ -416,8 +417,11 @@ private fun PageSection(d: AppData, store: AppStore) {
 private fun FontSection(d: AppData, store: AppStore) {
     Section {
         SubHead(tr("settings.sub.text"), tr("settings.sheetFixed"))
-        SettingRow(tr("settings.fontFamily"), stacked = true) {
-            Select(d.settings.fontFamily, DOC_FONT_NAMES.map { it to it }, { store.setSettings { s -> s.copy(fontFamily = it) } }, fullWidth = true)
+        SettingRow(tr("settings.fontEn"), stacked = true) {
+            Select(d.settings.fontEn, DOC_FONTS_EN.map { it to it }, { store.setSettings { s -> s.copy(fontEn = it) } }, fullWidth = true)
+        }
+        SettingRow(tr("settings.fontBn"), stacked = true, tip = tr("tip.fontMath")) {
+            Select(d.settings.fontBn, DOC_FONTS_BN.map { it to it }, { store.setSettings { s -> s.copy(fontBn = it) } }, fullWidth = true)
         }
         SettingRow(tr("settings.fontSize")) {
             val sizes = listOf(10, 11, 12, 13, 14, 15, 16, 18, 20, 22, 24)

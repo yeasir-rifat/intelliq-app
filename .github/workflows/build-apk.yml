@@ -21,7 +21,7 @@ jobs:
         with:
           gradle-version: "8.9"
 
-      - name: Download fonts (Lato, Noto Serif Bengali, Tinos, Caladea, ...)
+      - name: Download fonts (Lato, Noto Serif Bengali, Tinos, Gelasio, Caladea, Nikosh, AdorshoLipi, ...)
         run: bash android/scripts/fetch_fonts.sh
 
       - name: Build release APK (fast, signed with the debug key)

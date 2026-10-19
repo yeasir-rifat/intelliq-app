@@ -286,7 +286,7 @@ fun PaperPages(
     val density = LocalDensity.current
     val bn = lang == Lang.BN
     val st = PaperStyle(
-        fonts = paperFonts(settings.fontFamily),
+        fonts = paperFonts(settings.fontEn, settings.fontBn, bn),
         basePx = settings.fontSize * 96f / 72f,
         color = parseHex(settings.fontColor, Color(0xFF111111)),
         bn = bn,
@@ -878,7 +878,7 @@ fun BrandPreview(brand: BrandSettings, doc: DocFields, settings: DocSettings, la
         val pageContent = mmDp(size.first - 2f * PAGE_MARGIN_MM)
         val k = (inner.value / pageContent.value).coerceIn(0.2f, 1f)
         val st = PaperStyle(
-            fonts = paperFonts(settings.fontFamily),
+            fonts = paperFonts(settings.fontEn, settings.fontBn, lang == Lang.BN),
             basePx = settings.fontSize * 96f / 72f * k,
             color = parseHex(settings.fontColor, Color(0xFF111111)),
             bn = lang == Lang.BN,
@@ -1349,7 +1349,7 @@ private fun modeName(m: Int) = when (m) { 1 -> "horizontal"; 2 -> "grid"; else -
 fun resolveOptionLayout(q: Question, settings: DocSettings, bn: Boolean, density: Density, measurer: TextMeasurer): String {
     if (q.layout != "auto") return q.layout
     val st = PaperStyle(
-        fonts = paperFonts(settings.fontFamily),
+        fonts = paperFonts(settings.fontEn, settings.fontBn, bn),
         basePx = settings.fontSize * 96f / 72f,
         color = Color.Black, bn = bn, density = density,
     )

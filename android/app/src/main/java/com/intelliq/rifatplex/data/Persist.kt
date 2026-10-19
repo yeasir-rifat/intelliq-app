@@ -62,7 +62,7 @@ private fun decodeQuestion(o: JSONObject): Question {
 
 private fun encodeSettings(st: DocSettings): JSONObject {
     val o = JSONObject().put("pageSize", st.pageSize).put("pageColor", st.pageColor)
-        .put("fontFamily", st.fontFamily).put("fontSize", st.fontSize)
+        .put("fontEn", st.fontEn).put("fontBn", st.fontBn).put("fontSize", st.fontSize)
         .put("fontColor", st.fontColor).put("chemAuto", st.chemAuto)
         .put("sectionMode", st.sectionMode)
         .put("sectionOrder", JSONArray(st.orderedTypes()))
@@ -147,8 +147,12 @@ private fun decodeSettings(st: JSONObject, def: DocSettings): DocSettings {
     return DocSettings(
         pageSize = st.optString("pageSize", def.pageSize),
         pageColor = st.optString("pageColor", def.pageColor),
-        fontFamily = st.optString("fontFamily", def.fontFamily)
-            .let { if (it in com.intelliq.rifatplex.ui.theme.DOC_FONT_NAMES) it else def.fontFamily }, // e.g. the removed "Shonar Bangla" / "Nikosh BAN"
+        // old files only have "fontFamily" (one font for everything): map it onto the two new fields
+        fontEn = st.optString("fontEn", "").ifEmpty {
+            if (st.optString("fontFamily") == "Cambria Math") "Cambria" else def.fontEn
+        }.let { if (it in com.intelliq.rifatplex.ui.theme.DOC_FONTS_EN) it else def.fontEn },
+        fontBn = st.optString("fontBn", "").ifEmpty { st.optString("fontFamily") }
+            .let { if (it in com.intelliq.rifatplex.ui.theme.DOC_FONTS_BN) it else def.fontBn },
         fontSize = st.optInt("fontSize", def.fontSize),
         fontColor = st.optString("fontColor", def.fontColor),
         chemAuto = st.optBoolean("chemAuto", false),
