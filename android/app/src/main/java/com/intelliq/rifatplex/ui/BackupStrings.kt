@@ -3,6 +3,11 @@ package com.intelliq.rifatplex.ui
 /** Strings of the backup / restore section in the account dialog (kept apart from I18n.kt). */
 internal val BK_EN = mapOf(
     "eval.rep.btn" to "Report PDF",
+    "eval.rep.kicker" to "OMR evaluation",
+    "eval.rep.dist" to "Score distribution",
+    "eval.rep.median" to "Median",
+    "eval.rep.prepared" to "Prepared by",
+    "eval.rep.checked" to "Checked by",
     "eval.rep.title" to "Result report",
     "eval.rep.evaluated" to "Sheets evaluated",
     "eval.rep.avg" to "Average",
@@ -31,6 +36,11 @@ internal val BK_EN = mapOf(
 
 internal val BK_BN = mapOf(
     "eval.rep.btn" to "রিপোর্ট PDF",
+    "eval.rep.kicker" to "ওএমআর মূল্যায়ন",
+    "eval.rep.dist" to "নম্বরের বণ্টন",
+    "eval.rep.median" to "মধ্যমা",
+    "eval.rep.prepared" to "প্রস্তুতকারী",
+    "eval.rep.checked" to "যাচাইকারী",
     "eval.rep.title" to "ফলাফল প্রতিবেদন",
     "eval.rep.evaluated" to "মূল্যায়ন হয়েছে",
     "eval.rep.avg" to "গড়",

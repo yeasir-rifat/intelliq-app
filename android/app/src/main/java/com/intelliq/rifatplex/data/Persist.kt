@@ -71,6 +71,7 @@ private fun encodeSettings(st: DocSettings): JSONObject {
         .put("sectionLineOff", JSONArray(st.sectionLineOff.toList()))
         .put("showMarks", st.showMarks)
         .put("showPageNumber", st.showPageNumber)
+        .put("boldQuestions", st.boldQuestions)
         .put("autoFix", st.autoFix)
         .put("showAnswer", st.showAnswer)
         .put("showExplanation", st.showExplanation)
@@ -160,6 +161,7 @@ private fun decodeSettings(st: JSONObject, def: DocSettings): DocSettings {
         sectionLineOff = if (st.has("sectionLineOff")) st.optJSONArray("sectionLineOff").strings().toSet() else def.sectionLineOff,
         showMarks = st.optBoolean("showMarks", true),
         showPageNumber = st.optBoolean("showPageNumber", true),
+        boldQuestions = st.optBoolean("boldQuestions", true),
         autoFix = st.optBoolean("autoFix", false),
         showAnswer = st.optBoolean("showAnswer", true),
         showExplanation = st.optBoolean("showExplanation", true),

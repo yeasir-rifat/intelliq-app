@@ -81,10 +81,18 @@ import com.intelliq.rifatplex.ui.theme.IQ
 
 /* ───────────── styled text helpers (shared with the paper) ───────────── */
 
-fun CharStyle.toSpan(subSupScale: Float): SpanStyle = SpanStyle(
+/**
+ * [baseBold] = "bold question text" is on for this text: every character is bold unless it was turned back to normal
+ * ([CharStyle.plain]). Without it only the characters marked bold are bold.
+ */
+fun CharStyle.toSpan(subSupScale: Float, baseBold: Boolean = false): SpanStyle = SpanStyle(
     color = if (color != 0) Color(color) else Color.Unspecified,
     fontSize = if (sub || sup) subSupScale.em else TextUnit.Unspecified,
-    fontWeight = if (bold) FontWeight.Bold else null,
+    fontWeight = when {
+        bold -> FontWeight.Bold
+        baseBold -> if (plain) FontWeight.Normal else FontWeight.Bold
+        else -> null
+    },
     fontStyle = if (italic) FontStyle.Italic else null,
     baselineShift = when {
         sub -> BaselineShift.Subscript
@@ -94,16 +102,16 @@ fun CharStyle.toSpan(subSupScale: Float): SpanStyle = SpanStyle(
     textDecoration = if (underline) TextDecoration.Underline else null,
 )
 
-fun buildStyled(text: String, styles: List<CharStyle>, subSupScale: Float): AnnotatedString {
+fun buildStyled(text: String, styles: List<CharStyle>, subSupScale: Float, baseBold: Boolean = false): AnnotatedString {
     if (styles.size != text.length) return AnnotatedString(text)
-    val plain = CharStyle()
+    val blank = CharStyle()
     return buildAnnotatedString {
         append(text)
         var i = 0
         while (i < text.length) {
             var j = i + 1
             while (j < text.length && styles[j] == styles[i]) j++
-            if (styles[i] != plain) addStyle(styles[i].toSpan(subSupScale), i, j)
+            if (baseBold || styles[i] != blank) addStyle(styles[i].toSpan(subSupScale, baseBold), i, j)
             i = j
         }
     }
@@ -117,6 +125,9 @@ fun htmlToAnnotated(html: String, subSupScale: Float): AnnotatedString {
 
 /** Whether the "Chemistry auto-format" switch is on (provided by IntelliQApp). */
 val LocalChemAuto = androidx.compose.runtime.staticCompositionLocalOf { false }
+
+/** Whether the "Bold question text" switch is on (provided by IntelliQApp and the PDF export). */
+val LocalBoldQuestions = androidx.compose.runtime.staticCompositionLocalOf { true }
 
 /* ───────────── editor state ───────────── */
 
@@ -170,9 +181,10 @@ private fun atomChip(s: CharStyle, figLines: (FigData) -> Int = { 0 }): String {
 fun editorTransformed(
     text: String, styles: List<CharStyle>, scale: Float, chipFg: Color, chipBg: Color,
     figLines: (FigData) -> Int = { 0 },
+    baseBold: Boolean = false,
 ): TransformedText {
     if (styles.size != text.length || (FRAC_CHAR !in text && FIG_CHAR !in text)) {
-        return TransformedText(buildStyled(text, styles, scale), OffsetMapping.Identity)
+        return TransformedText(buildStyled(text, styles, scale, baseBold), OffsetMapping.Identity)
     }
     val idx = ArrayList<Int>()
     val lens = ArrayList<Int>()
@@ -180,14 +192,14 @@ fun editorTransformed(
         var seg = 0
         for (i in text.indices) {
             if (isAtomAt(text, styles, i)) {
-                if (i > seg) append(buildStyled(text.substring(seg, i), styles.subList(seg, i), scale))
+                if (i > seg) append(buildStyled(text.substring(seg, i), styles.subList(seg, i), scale, baseBold))
                 val chip = atomChip(styles[i], figLines)
                 if (chip.startsWith("\n")) append(chip) else withStyle(SpanStyle(color = chipFg, background = chipBg)) { append(chip) }
                 idx.add(i); lens.add(chip.length)
                 seg = i + 1
             }
         }
-        if (seg < text.length) append(buildStyled(text.substring(seg), styles.subList(seg, text.length), scale))
+        if (seg < text.length) append(buildStyled(text.substring(seg), styles.subList(seg, text.length), scale, baseBold))
     }
     val mapping = object : OffsetMapping {
         override fun originalToTransformed(offset: Int): Int {
@@ -221,6 +233,8 @@ class RichEditorState(html: String) : RichHandle {
     var lastHtml: String = html
     var onHtml: (String) -> Unit = {}
     var chemAuto: Boolean = false
+    /** "Bold question text" is on for this field: bold is the default weight, the Bold button turns it back to normal. */
+    var baseBold: Boolean = false
     private var autoSubEnd = -1 // index right after the last auto-subscripted digit
 
     fun reset(html: String) {
@@ -243,14 +257,20 @@ class RichEditorState(html: String) : RichHandle {
     private fun styleBefore(pos: Int): CharStyle =
         (if (pos > 0 && pos - 1 < styles.size) styles[pos - 1] else styles.firstOrNull() ?: CharStyle()).noFrac()
 
+    private fun effBold(s: CharStyle): Boolean = s.bold || (baseBold && !s.plain)
+
+    /** Bold on = explicit bold; bold off = plain normal weight (only needs the marker while bold is the default). */
+    private fun setBold(s: CharStyle, on: Boolean): CharStyle =
+        if (on) s.copy(bold = true, plain = false) else s.copy(bold = false, plain = baseBold)
+
     private fun current(): CharStyle {
         val sel = tfv.selection
-        if (sel.collapsed) return typing ?: styleBefore(sel.start)
+        if (sel.collapsed) return (typing ?: styleBefore(sel.start)).let { it.copy(bold = effBold(it)) }
         val part = styles.subList(sel.min.coerceAtMost(styles.size), sel.max.coerceAtMost(styles.size))
         if (part.isEmpty()) return CharStyle()
         val first = part.first()
         return CharStyle(
-            bold = part.all { it.bold }, italic = part.all { it.italic }, underline = part.all { it.underline },
+            bold = part.all { effBold(it) }, italic = part.all { it.italic }, underline = part.all { it.underline },
             sub = part.all { it.sub }, sup = part.all { it.sup },
             color = if (part.all { it.color == first.color }) first.color else 0,
         )
@@ -272,6 +292,16 @@ class RichEditorState(html: String) : RichHandle {
 
     override fun toggle(f: Fmt) {
         val sel = tfv.selection
+        if (f == Fmt.Bold) {
+            if (sel.collapsed) {
+                val base = typing ?: styleBefore(sel.start)
+                typing = setBold(base, !effBold(base))
+            } else {
+                val on = !current().bold
+                mapSelection { setBold(it, on) }
+            }
+            return
+        }
         if (sel.collapsed) {
             val base = typing ?: styleBefore(sel.start)
             typing = base.with(f, !base.has(f))
@@ -486,12 +516,15 @@ fun RichEditor(
     minHeight: Dp = 44.dp,
     onFocus: (RichHandle) -> Unit = {},
     fieldBg: Color? = null,
+    /** Question text fields: bold by default while "Bold question text" is on (the setting is passed by the caller). */
+    boldBase: Boolean = false,
 ) {
     val c = IQ.c
     val family = uiFont()
     val state = remember { RichEditorState(html) }
     state.onHtml = onHtml
     state.chemAuto = LocalChemAuto.current
+    state.baseBold = boldBase
     SideEffect { if (html != state.lastHtml) state.reset(html) }
     var focused by remember { mutableStateOf(false) }
     val shape = IQD.ctl
@@ -522,7 +555,7 @@ fun RichEditor(
         kotlin.math.ceil(h / lineH).toInt() + 2
     }
     val figLinesNow by rememberUpdatedState(figLines)
-    val vt = VisualTransformation { t -> editorTransformed(t.text, styles, 0.75f, chipFg, chipBg, figLines) }
+    val vt = VisualTransformation { t -> editorTransformed(t.text, styles, 0.75f, chipFg, chipBg, figLines, boldBase) }
     var layout by remember { mutableStateOf<TextLayoutResult?>(null) }
     val padX = with(LocalDensity.current) { 12.dp.toPx() }
     val padY = with(LocalDensity.current) { 9.dp.toPx() }

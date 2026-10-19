@@ -22,13 +22,13 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.TextUnit
 import com.intelliq.rifatplex.ui.theme.Lato
-import com.intelliq.rifatplex.ui.theme.NotoSerifBengali
+import com.intelliq.rifatplex.ui.theme.BanglaUi
 
 /*
- * In Bangla mode the whole UI uses Noto Serif Bengali, which also contains Latin glyphs, so English words and
- * numbers inside Bangla text were drawn in Noto Serif instead of Lato. This file fixes that in one place:
+ * In Bangla mode the whole UI uses SolaimanLipi (BanglaUi), which also contains Latin glyphs, so English words and
+ * numbers inside Bangla text would be drawn in SolaimanLipi instead of Lato. This file fixes that in one place:
  * every Latin run (A-Z, a-z, 0-9 and the spaces/punctuation between two such characters) gets Lato,
- * Bangla characters keep Noto Serif Bengali. Only the app UI font is affected, paper fonts are untouched.
+ * Bangla characters keep SolaimanLipi. Only the app UI font is affected, paper fonts are untouched.
  */
 
 private fun isLatinChar(ch: Char): Boolean = ch in 'A'..'Z' || ch in 'a'..'z' || ch in '0'..'9'
@@ -97,7 +97,7 @@ fun Text(
     onTextLayout: ((TextLayoutResult) -> Unit)? = null,
     style: TextStyle = LocalTextStyle.current,
 ) {
-    val bangla = fontFamily === NotoSerifBengali || (fontFamily == null && style.fontFamily === NotoSerifBengali)
+    val bangla = fontFamily === BanglaUi || (fontFamily == null && style.fontFamily === BanglaUi)
     val shown = remember(text, bangla) { if (bangla) withLatinFont(text) else AnnotatedString(text) }
     androidx.compose.material3.Text(
         text = shown, modifier = modifier, color = color, fontSize = fontSize, fontStyle = fontStyle,

@@ -4,7 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.text.font.FontFamily
 import com.intelliq.rifatplex.ui.theme.Lato
-import com.intelliq.rifatplex.ui.theme.NotoSerifBengali
+import com.intelliq.rifatplex.ui.theme.BanglaUi
 
 enum class Lang { EN, BN }
 
@@ -316,6 +316,8 @@ private val EXTRA_EN = mapOf(
     "sec.mInstr" to "Section instruction",
     "sec.countSuffix" to "",
     "settings.showMarks" to "Show marks in [ ] right.",
+    "settings.boldQuestions" to "Bold question text",
+    "tip.boldQuestions" to "Question text of all six types is bold on the paper and in the input field. Select text in the input field and tap B to turn it back to normal.",
     "doc.answerSheet" to "Answer Sheet",
     "settings.ansFmt" to "Answer sheet formatting",
     "settings.keepAnswer" to "Keep correct answer",
@@ -892,6 +894,8 @@ private val EXTRA_BN = mapOf(
     "sec.mInstr" to "সেকশনের নির্দেশিকা",
     "sec.countSuffix" to " টি",
     "settings.showMarks" to "প্রশ্নের ডানে নম্বর নির্দেশক চান",
+    "settings.boldQuestions" to "প্রশ্নের টেক্সট বোল্ড করুন",
+    "tip.boldQuestions" to "ছয় ধরনের প্রশ্নের টেক্সট পেপারে ও ইনপুট ফিল্ডে বোল্ড থাকবে। ইনপুট ফিল্ডে লেখা সিলেক্ট করে B চাপলে সেটুকু আবার সাধারণ হবে।",
     "doc.answerSheet" to "উত্তরমালা",
     "settings.ansFmt" to "উত্তরপত্র ফরম্যাটিং",
     "settings.keepAnswer" to "সঠিক উত্তর রাখুন",
@@ -1179,4 +1183,4 @@ fun countText(n: Int, lang: Lang, singularKey: String, pluralKey: String): Strin
     "$n ${trKey(if (n == 1) singularKey else pluralKey, lang)}"
 
 @Composable
-fun uiFont(): FontFamily = if (LocalLang.current == Lang.BN) NotoSerifBengali else Lato
+fun uiFont(): FontFamily = if (LocalLang.current == Lang.BN) BanglaUi else Lato

@@ -429,6 +429,9 @@ private fun FontSection(d: AppData, store: AppStore) {
         SettingRow(tr("settings.showMarks")) {
             IQSwitch(d.settings.showMarks) { on -> store.setSettings { s -> s.copy(showMarks = on) } }
         }
+        SettingRow(tr("settings.boldQuestions"), tip = tr("tip.boldQuestions")) {
+            IQSwitch(d.settings.boldQuestions) { on -> store.setSettings { s -> s.copy(boldQuestions = on) } }
+        }
         SettingRow(tr("settings.chemAuto"), tip = tr("tip.chem")) {
             IQSwitch(d.settings.chemAuto) { on -> store.setSettings { s -> s.copy(chemAuto = on) } }
         }

@@ -233,7 +233,7 @@ fun TypeSelect(kind: String, onPick: (String) -> Unit, modifier: Modifier = Modi
 fun TfBody(q: Question, store: AppStore, onFocus: (RichHandle) -> Unit) {
     RichEditor(
         q.text, { store.setQuestionText(q.id, it) }, tr("t.tfStatement"),
-        minHeight = 44.dp, onFocus = onFocus,
+        minHeight = 44.dp, onFocus = onFocus, boldBase = LocalBoldQuestions.current,
     )
     Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         TfButton(tr("t.tfTrue"), q.tfAnswer == true) {
@@ -287,6 +287,7 @@ fun FillBody(q: Question, store: AppStore, onFocus: (RichHandle) -> Unit) {
             questionHandle = it
             onFocus(it)
         },
+        boldBase = LocalBoldQuestions.current,
     )
     Box(Modifier.padding(top = 8.dp)) {
         AddButton("＋ " + tr("t.addBlank")) {
@@ -308,7 +309,7 @@ fun FillBody(q: Question, store: AppStore, onFocus: (RichHandle) -> Unit) {
 fun ShortBody(q: Question, store: AppStore, isDesc: Boolean, onFocus: (RichHandle) -> Unit) {
     RichEditor(
         q.text, { store.setQuestionText(q.id, it) }, tr("ph.question"),
-        minHeight = 44.dp, onFocus = onFocus,
+        minHeight = 44.dp, onFocus = onFocus, boldBase = LocalBoldQuestions.current,
     )
     LabeledBlock(
         tr(if (isDesc) "t.descAnsLbl" else "t.shortAnsLbl"),
@@ -343,7 +344,7 @@ fun CreativeBody(q: Question, store: AppStore, bn: Boolean, onFocus: (RichHandle
         SecLabel(tr("t.stimulusLbl"))
         RichEditor(
             q.text, { store.setQuestionText(q.id, it) }, tr("t.stimulusPh"),
-            minHeight = 44.dp, onFocus = onFocus,
+            minHeight = 44.dp, onFocus = onFocus, boldBase = LocalBoldQuestions.current,
         )
     }
 

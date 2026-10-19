@@ -22,13 +22,14 @@ import java.util.Locale
 /*
  * The "Report PDF" of an OMR evaluation: every marked sheet in rank order, A4 portrait.
  *
- *  - Page 1: a brand-blue header (logo, title, exam, date), four summary cards (evaluated, average, highest, lowest) and
- *    a "Top performers" row with the first three students.
+ *  - Page 1: a brand-blue header (logo, kicker, title, exam, date chip, a gold hairline), four summary cards, a
+ *    "Top performers" panel (first three ranks) beside a score-distribution chart with the median.
  *  - Then the full ranking table: rank, roll, (set), score with a coloured progress bar, percent, right / wrong / blank
  *    and a short note (same roll on two sheets, or a sheet that still needs a look). It continues on more pages with a
  *    slim header and the same column header.
  *  - Ranking comes from [OmrReport.rank]: equal scores share a rank, several sheets of one student are added up.
- *  - Every page has a footer with the brand line and "Page x / y".
+ *  - The last page ends with two signature lines (prepared by / checked by) when there is room.
+ *  - Every page has a footer: "©IntelliQ • 2026" and "Page x / y".
  *
  * English uses Lato, Bangla uses Kalpurush (which also has the Latin letters and the digits).
  */
@@ -50,6 +51,7 @@ internal object OmrReportPdf {
     private val RED = Color.rgb(0xCC, 0x24, 0x56)
     private val AMBER = Color.rgb(0xD9, 0x77, 0x06)
     private val INDIGO = Color.rgb(0x4F, 0x46, 0xE5)
+    private val GOLD = Color.rgb(0xE9, 0xB9, 0x49)
 
     fun hasRows(sheets: List<EvalSheet>): Boolean = OmrResultPdf.reportRows(sheets).isNotEmpty()
 
@@ -63,12 +65,14 @@ internal object OmrReportPdf {
         fun digits(s: String) = if (bn) s.map { if (it in '0'..'9') '\u09E6' + (it - '0') else it }.joinToString("") else s
         fun num(v: Double) = digits(OmrReport.num(v))
         fun t(key: String) = trKey(key, lang)
+        fun caps(x: String) = if (bn) x else x.uppercase(Locale.ENGLISH)
 
-        fun paint(color: Int, size: Float, bold: Boolean = false, align: Paint.Align = Paint.Align.LEFT, alpha: Int = 255) =
+        fun paint(color: Int, size: Float, bold: Boolean = false, align: Paint.Align = Paint.Align.LEFT, alpha: Int = 255, spacing: Float = 0f) =
             Paint(Paint.ANTI_ALIAS_FLAG or Paint.SUBPIXEL_TEXT_FLAG).apply {
                 this.color = color
                 this.alpha = alpha
                 textSize = size
+                if (!bn) letterSpacing = spacing
                 typeface = if (bn) kalpurush else if (bold) latoBold else lato
                 isFakeBoldText = bn && bold
                 textAlign = align
@@ -120,7 +124,7 @@ internal object OmrReportPdf {
         val xEnd = W - M
 
         // ----- pagination: page 1 has the header + podium, the others a slim header -----
-        val firstTop = 336f
+        val firstTop = 378f
         val nextTop = 74f
         val bottom = FOOT_Y - 18f
         val firstRows = ((bottom - firstTop - HEAD_ROW_H) / ROW_H).toInt()
@@ -147,32 +151,55 @@ internal object OmrReportPdf {
 
             if (pi == 0) {
                 // ---------- header ----------
-                val hh = 165f
+                val hh = 168f
                 val bg = Paint(Paint.ANTI_ALIAS_FLAG).apply { shader = LinearGradient(0f, 0f, W.toFloat(), hh, BLUE, NAVY, Shader.TileMode.CLAMP) }
                 c.drawRect(0f, 0f, W.toFloat(), hh, bg)
-                val soft = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE; alpha = 22 }
-                c.drawCircle(W - 40f, 20f, 120f, soft)
-                c.drawCircle(W - 150f, hh + 10f, 70f, soft)
+                val soft = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE; alpha = 20 }
+                c.drawCircle(W - 30f, 10f, 130f, soft)
+                c.drawCircle(W - 170f, hh + 24f, 74f, soft)
+                val dot = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE; alpha = 46 }
+                var gx = 372f
+                while (gx < W - 14f) {
+                    var gy = 72f
+                    while (gy < hh - 14f) { c.drawCircle(gx, gy, 1.1f, dot); gy += 13f }
+                    gx += 13f
+                }
+                // gold hairline along the bottom edge of the header
+                c.drawRect(0f, hh - 2.2f, W.toFloat(), hh, Paint().apply {
+                    shader = LinearGradient(0f, 0f, W.toFloat(), 0f, GOLD, Color.argb(0, 0xE9, 0xB9, 0x49), Shader.TileMode.CLAMP)
+                })
                 // logo tile + brand name
                 fill(c, RectF(M, 28f, M + 34f, 62f), 9f, Color.WHITE)
                 if (logo != null) c.drawBitmap(logo, null, RectF(M + 5f, 33f, M + 29f, 57f), Paint(Paint.FILTER_BITMAP_FLAG))
                 c.drawText("IntelliQ", M + 44f, 51f, paint(Color.WHITE, 16f, true))
-                c.drawText(stamp, xEnd, 48f, paint(Color.WHITE, 9.5f, false, Paint.Align.RIGHT, 215))
+                // date chip
+                val chipP = paint(Color.WHITE, 9f, true)
+                val chipW = chipP.measureText(stamp) + 22f
+                fill(c, RectF(xEnd - chipW, 34f, xEnd, 54f), 10f, Color.WHITE, 40)
+                c.drawText(stamp, xEnd - chipW / 2f, 47.2f, paint(Color.WHITE, 9f, true, Paint.Align.CENTER))
                 // title block
-                c.drawText(t("eval.rep.title"), M, 92f, paint(Color.WHITE, 27f, true))
-                c.drawText(fit(title, paint(Color.WHITE, 14f, true), xEnd - M), M, 113f, paint(Color.WHITE, 14f, true))
+                c.drawText(caps(t("eval.rep.kicker")), M, 84f, paint(GOLD, 8.5f, true, spacing = 0.18f))
+                c.drawText(t("eval.rep.title"), M, 110f, paint(Color.WHITE, 27f, true))
+                val ep = paint(Color.WHITE, 13.5f, true)
+                c.drawText(fit(title, ep, xEnd - M), M, 129f, ep)
                 val sub = examSub.trim()
-                if (sub.isNotEmpty()) c.drawText(fit(sub, paint(Color.WHITE, 10.5f), xEnd - M), M, 129f, paint(Color.WHITE, 10.5f, false, Paint.Align.LEFT, 215))
+                if (sub.isNotEmpty()) c.drawText(fit(sub, paint(Color.WHITE, 10f), xEnd - M), M, 144f, paint(Color.WHITE, 10f, false, Paint.Align.LEFT, 210))
 
                 // ---------- summary cards (overlap the header edge) ----------
                 val scores = ranked.map { it.row.score }
                 val avg = if (scores.isEmpty()) 0.0 else scores.average()
+                val sortedScores = scores.sorted()
+                val median = when {
+                    sortedScores.isEmpty() -> 0.0
+                    sortedScores.size % 2 == 1 -> sortedScores[sortedScores.size / 2]
+                    else -> (sortedScores[sortedScores.size / 2 - 1] + sortedScores[sortedScores.size / 2]) / 2.0
+                }
                 val hi = ranked.firstOrNull()
                 val lo = ranked.lastOrNull()
                 val gap = 10f
                 val cw = (xEnd - M - gap * 3) / 4f
-                val cy = 140f
-                val ch = 64f
+                val cy = 154f
+                val ch = 66f
                 data class Card(val label: String, val value: String, val unit: String, val color: Int)
                 val cards = listOf(
                     Card(t("eval.rep.evaluated"), digits(ranked.size.toString()), "", BLUE),
@@ -183,43 +210,73 @@ internal object OmrReportPdf {
                 for ((i, k) in cards.withIndex()) {
                     val x = M + i * (cw + gap)
                     val r = RectF(x, cy, x + cw, cy + ch)
-                    fill(c, RectF(r.left, r.top + 2f, r.right, r.bottom + 2f), 11f, Color.BLACK, 28)
-                    fill(c, r, 11f, Color.WHITE)
-                    stroke(c, r, 11f, LINE)
-                    fill(c, RectF(x + 10f, cy + 12f, x + 14f, cy + 28f), 2f, k.color)
-                    c.drawText(fit(k.label, paint(MUTED, 9.5f), cw - 28f), x + 20f, cy + 24f, paint(MUTED, 9.5f))
-                    val vp = paint(k.color, 21f, true)
-                    c.drawText(k.value, x + 14f, cy + 52f, vp)
-                    if (k.unit.isNotEmpty()) c.drawText(k.unit, x + 14f + vp.measureText(k.value) + 4f, cy + 52f, paint(MUTED, 9.5f))
+                    fill(c, RectF(r.left + 1f, r.top + 3.5f, r.right - 1f, r.bottom + 3.5f), 12f, Color.BLACK, 16)
+                    fill(c, RectF(r.left, r.top + 1.5f, r.right, r.bottom + 1.5f), 12f, Color.BLACK, 14)
+                    fill(c, r, 12f, Color.WHITE)
+                    stroke(c, r, 12f, LINE)
+                    fill(c, RectF(x + 14f, cy - 0.5f, x + 38f, cy + 2.8f), 1.6f, k.color)
+                    val lp = paint(MUTED, 8f, true, spacing = 0.1f)
+                    c.drawText(fit(caps(k.label), lp, cw - 24f), x + 14f, cy + 22f, lp)
+                    val vp = paint(INK, 23f, true)
+                    c.drawText(k.value, x + 14f, cy + 51f, vp)
+                    if (k.unit.isNotEmpty()) c.drawText(k.unit, x + 14f + vp.measureText(k.value) + 4f, cy + 51f, paint(MUTED, 9.5f))
                 }
 
-                // ---------- top performers ----------
-                c.drawText(t("eval.rep.top"), M, 232f, paint(INK, 12.5f, true))
-                fill(c, RectF(M, 238f, M + 28f, 240f), 1f, BLUE)
+                // ---------- top performers (left) ----------
+                val py = 244f
+                c.drawText(t("eval.rep.top"), M, py, paint(INK, 12f, true))
+                fill(c, RectF(M, py + 6f, M + 26f, py + 8f), 1f, BLUE)
                 val top = ranked.take(3)
-                val tg = 10f
-                val tw = (xEnd - M - tg * 2) / 3f
+                val lw = 300f
                 val medal = listOf(
                     Triple(Color.rgb(0xF2, 0xB8, 0x1C), Color.rgb(0xFE, 0xF6, 0xDC), Color.rgb(0xF3, 0xD0, 0x7A)),
                     Triple(Color.rgb(0x8E, 0x9A, 0xAE), Color.rgb(0xF0, 0xF3, 0xF8), Color.rgb(0xC9, 0xD1, 0xDD)),
                     Triple(Color.rgb(0xC9, 0x7B, 0x3D), Color.rgb(0xFC, 0xEE, 0xE2), Color.rgb(0xE6, 0xB9, 0x8E)),
                 )
                 for ((i, r) in top.withIndex()) {
-                    val x = M + i * (tw + tg)
-                    val rr = RectF(x, 248f, x + tw, 248f + 66f)
+                    val ty = py + 18f + i * 38f
+                    val rr = RectF(M, ty, M + lw, ty + 32f)
                     val (strong, soft2, edge) = medal[minOf(i, 2)]
-                    fill(c, rr, 12f, soft2)
-                    stroke(c, rr, 12f, edge, 1f)
-                    c.drawCircle(x + 22f, 248f + 33f, 13f, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = strong })
-                    c.drawText(digits(r.rank.toString()), x + 22f, 248f + 38f, paint(Color.WHITE, 13f, true, Paint.Align.CENTER))
+                    fill(c, rr, 10f, soft2)
+                    stroke(c, rr, 10f, edge, 0.9f)
+                    c.drawCircle(M + 20f, ty + 16f, 11.5f, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = strong })
+                    c.drawText(digits(r.rank.toString()), M + 20f, ty + 20.3f, paint(Color.WHITE, 12f, true, Paint.Align.CENTER))
                     val rollTxt = r.row.roll.ifEmpty { "-" }
-                    c.drawText(fit(digits(rollTxt), paint(INK, 12f, true), tw - 100f), x + 42f, 248f + 28f, paint(INK, 12f, true))
-                    val setTxt = r.row.setIndex?.let { t("eval.set") + " " + digits((it + 1).toString()) } ?: (t("eval.roll"))
-                    c.drawText(setTxt, x + 42f, 248f + 44f, paint(MUTED, 9f))
-                    val sp = paint(INK, 17f, true, Paint.Align.RIGHT)
-                    c.drawText(num(r.row.score), x + tw - 12f, 248f + 31f, sp)
-                    c.drawText("/ " + num(r.row.total) + "  \u00B7  " + digits(pct(r).toString()) + "%", x + tw - 12f, 248f + 48f, paint(MUTED, 9f, false, Paint.Align.RIGHT))
+                    c.drawText(fit(digits(rollTxt), paint(INK, 11.5f, true), 120f), M + 40f, ty + 14f, paint(INK, 11.5f, true))
+                    val setTxt = r.row.setIndex?.let { t("eval.set") + " " + digits((it + 1).toString()) } ?: t("eval.roll")
+                    c.drawText(setTxt, M + 40f, ty + 26f, paint(MUTED, 8.5f))
+                    c.drawText(num(r.row.score), M + lw - 74f, ty + 20.5f, paint(INK, 15f, true, Paint.Align.RIGHT))
+                    c.drawText("/ " + num(r.row.total), M + lw - 70f, ty + 20.5f, paint(MUTED, 9f))
+                    c.drawText(digits(pct(r).toString()) + "%", M + lw - 12f, ty + 19.5f, paint(barColor(pct(r)), 10.5f, true, Paint.Align.RIGHT))
                 }
+
+                // ---------- score distribution (right) ----------
+                val dx = M + lw + 18f
+                val dw = xEnd - dx
+                c.drawText(t("eval.rep.dist"), dx, py, paint(INK, 12f, true))
+                fill(c, RectF(dx, py + 6f, dx + 26f, py + 8f), 1f, BLUE)
+                val counts = IntArray(5)
+                for (r in ranked) counts[minOf(4, pct(r) / 20)]++
+                val maxCount = maxOf(1, counts.maxOrNull() ?: 0)
+                val bandColor = intArrayOf(RED, AMBER, INDIGO, BLUE, GREEN)
+                val labelW = 46f
+                val countW = 22f
+                for (b in 0 until 5) {
+                    val by2 = py + 20f + (4 - b) * 17f
+                    val lbl = digits("${b * 20}–${b * 20 + 20}%")
+                    c.drawText(lbl, dx, by2 + 9f, paint(MUTED, 8.5f))
+                    val tr0 = RectF(dx + labelW, by2 + 1.5f, dx + dw - countW, by2 + 10.5f)
+                    fill(c, tr0, 4.5f, Color.rgb(0xE9, 0xED, 0xF3))
+                    if (counts[b] > 0) {
+                        val fw = maxOf(9f, (tr0.width()) * counts[b] / maxCount)
+                        fill(c, RectF(tr0.left, tr0.top, tr0.left + fw, tr0.bottom), 4.5f, bandColor[b])
+                    }
+                    c.drawText(digits(counts[b].toString()), dx + dw, by2 + 9.2f, paint(INK, 9.5f, true, Paint.Align.RIGHT))
+                }
+                c.drawText(
+                    t("eval.rep.median") + "  " + num(median) + " / " + num(total),
+                    dx, py + 20f + 5 * 17f + 10f, paint(MUTED, 9f, true),
+                )
                 y = firstTop
             } else {
                 // slim header
@@ -234,24 +291,32 @@ internal object OmrReportPdf {
 
             // ---------- table header ----------
             fill(c, RectF(M, y, xEnd, y + HEAD_ROW_H), 8f, NAVY)
-            val hp = paint(Color.WHITE, 9.5f, true)
-            val hpC = paint(Color.WHITE, 9.5f, true, Paint.Align.CENTER)
+            val hp = paint(Color.WHITE, 8.5f, true, spacing = 0.08f)
+            val hpC = paint(Color.WHITE, 8.5f, true, Paint.Align.CENTER, spacing = 0.08f)
             val hy = y + HEAD_ROW_H / 2f + 3.4f
-            c.drawText(t("eval.pdf.rank"), xRank + wRank / 2f, hy, hpC)
-            c.drawText(t("eval.roll"), xRoll + 6f, hy, hp)
-            if (showSet) c.drawText(t("eval.set"), xSet + wSet / 2f, hy, hpC)
-            c.drawText(t("eval.pdf.score"), xScore, hy, hp)
+            c.drawText(caps(t("eval.pdf.rank")), xRank + wRank / 2f, hy, hpC)
+            c.drawText(caps(t("eval.roll")), xRoll + 6f, hy, hp)
+            if (showSet) c.drawText(caps(t("eval.set")), xSet + wSet / 2f, hy, hpC)
+            c.drawText(caps(t("eval.pdf.score")), xScore, hy, hp)
             c.drawText("%", xPct + wPct / 2f, hy, hpC)
-            c.drawText(t("eval.c.right"), xRight + wCnt / 2f, hy, hpC)
-            c.drawText(t("eval.c.wrong"), xWrong + wCnt / 2f, hy, hpC)
-            c.drawText(t("eval.c.blank"), xBlank + wCnt / 2f, hy, hpC)
-            c.drawText(t("eval.pdf.note"), xNote + 4f, hy, hp)
+            c.drawText(caps(t("eval.c.right")), xRight + wCnt / 2f, hy, hpC)
+            c.drawText(caps(t("eval.c.wrong")), xWrong + wCnt / 2f, hy, hpC)
+            c.drawText(caps(t("eval.c.blank")), xBlank + wCnt / 2f, hy, hpC)
+            c.drawText(caps(t("eval.pdf.note")), xNote + 4f, hy, hp)
             y += HEAD_ROW_H
 
             // ---------- rows ----------
             for ((i, r) in rows.withIndex()) {
                 val top = y + i * ROW_H
-                if (i % 2 == 1) c.drawRect(M, top, xEnd, top + ROW_H, Paint().apply { color = ZEBRA })
+                if (r.rank <= 3) {
+                    val tint = when (r.rank) { 1 -> Color.rgb(0xFE, 0xF6, 0xDC); 2 -> Color.rgb(0xF0, 0xF3, 0xF8); else -> Color.rgb(0xFC, 0xEE, 0xE2) }
+                    val bar = when (r.rank) { 1 -> Color.rgb(0xF2, 0xB8, 0x1C); 2 -> Color.rgb(0x8E, 0x9A, 0xAE); else -> Color.rgb(0xC9, 0x7B, 0x3D) }
+                    c.drawRect(M, top, xEnd, top + ROW_H, Paint().apply { color = tint })
+                    c.drawRect(M, top, M + 3f, top + ROW_H, Paint().apply { color = bar })
+                } else if (i % 2 == 1) {
+                    c.drawRect(M, top, xEnd, top + ROW_H, Paint().apply { color = ZEBRA })
+                }
+                c.drawRect(M, top + ROW_H - 0.5f, xEnd, top + ROW_H, Paint().apply { color = LINE })
                 val by = top + ROW_H / 2f + 3.4f
                 // rank: a coloured disc for the first three ranks
                 if (r.rank <= 3) {
@@ -292,17 +357,29 @@ internal object OmrReportPdf {
                 }
             }
             val endY = y + rows.size * ROW_H
-            c.drawRect(M, endY, xEnd, endY + 0.8f, Paint().apply { color = LINE })
-            if (pi == pages.lastIndex && endY + 22f < FOOT_Y - 8f) {
-                c.drawText(t("eval.rep.tie"), M, endY + 16f, paint(MUTED, 8.5f))
+            c.drawRect(M, endY, xEnd, endY + 1.2f, Paint().apply { color = NAVY })
+            if (pi == pages.lastIndex) {
+                if (endY + 26f < FOOT_Y - 8f) c.drawText(t("eval.rep.tie"), M, endY + 17f, paint(MUTED, 8.5f))
+                // signature lines, only when there is comfortable room
+                val sigY = FOOT_Y - 30f
+                if (endY + 60f < sigY) {
+                    val sigW = 150f
+                    val lp = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = MUTED; strokeWidth = 0.7f }
+                    c.drawLine(M, sigY, M + sigW, sigY, lp)
+                    c.drawLine(xEnd - sigW, sigY, xEnd, sigY, lp)
+                    c.drawText(t("eval.rep.prepared"), M, sigY + 12f, paint(MUTED, 8.5f))
+                    c.drawText(t("eval.rep.checked"), xEnd - sigW, sigY + 12f, paint(MUTED, 8.5f))
+                }
             }
 
             // ---------- footer ----------
-            c.drawRect(M, FOOT_Y, xEnd, FOOT_Y + 0.8f, Paint().apply { color = LINE })
-            c.drawText("\u00A9IntelliQ \u2022 " + digits("2026"), M, FOOT_Y + 16f, paint(MUTED, 8.5f))
+            c.drawRect(M, FOOT_Y, xEnd, FOOT_Y + 1f, Paint().apply {
+                shader = LinearGradient(M, 0f, xEnd, 0f, BLUE, LINE, Shader.TileMode.CLAMP)
+            })
+            c.drawText("\u00A9IntelliQ \u2022 " + digits("2026"), M, FOOT_Y + 17f, paint(MUTED, 8.5f, true, spacing = 0.04f))
             c.drawText(
                 t("eval.rep.page").replace("{p}", digits((pi + 1).toString())).replace("{n}", digits(pages.size.toString())),
-                xEnd, FOOT_Y + 16f, paint(MUTED, 8.5f, false, Paint.Align.RIGHT),
+                xEnd, FOOT_Y + 17f, paint(MUTED, 8.5f, true, Paint.Align.RIGHT, spacing = 0.04f),
             )
             doc.finishPage(page)
         }

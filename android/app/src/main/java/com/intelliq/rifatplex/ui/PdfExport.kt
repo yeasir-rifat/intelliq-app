@@ -71,7 +71,7 @@ object PdfExport {
         val view = ComposeView(activity)
         view.setContent {
             IntelliQTheme(false) {
-                CompositionLocalProvider(LocalLang provides lang, LocalChemAuto provides d.settings.chemAuto) {
+                CompositionLocalProvider(LocalLang provides lang, LocalChemAuto provides d.settings.chemAuto, LocalBoldQuestions provides d.settings.boldQuestions) {
                     if (kind.isPaper) {
                         PaperPages(
                             questions = questions,
@@ -169,7 +169,7 @@ object PdfExport {
         val view = ComposeView(activity)
         view.setContent {
             IntelliQTheme(false) {
-                CompositionLocalProvider(LocalLang provides lang, LocalChemAuto provides d.settings.chemAuto) {
+                CompositionLocalProvider(LocalLang provides lang, LocalChemAuto provides d.settings.chemAuto, LocalBoldQuestions provides d.settings.boldQuestions) {
                     NumberingProbe(questions, setCode, d.doc, lang, d.settings, d.brand) { found[0] = it }
                 }
             }

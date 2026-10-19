@@ -200,6 +200,7 @@ private fun McqBody(q: Question, store: AppStore, bn: Boolean, onFocus: (RichHan
         placeholder = tr("ph.question"),
         minHeight = 44.dp,
         onFocus = onFocus,
+        boldBase = LocalBoldQuestions.current,
     )
     Box(Modifier.height(12.dp))
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {

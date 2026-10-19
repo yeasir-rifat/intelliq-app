@@ -114,7 +114,7 @@ fun InputBox(
         value = value,
         onValueChange = onChange,
         textStyle = TextStyle(fontSize = 14.sp, color = c.text, fontFamily = family),
-        visualTransformation = if (family === com.intelliq.rifatplex.ui.theme.NotoSerifBengali) LatinVisualTransformation else androidx.compose.ui.text.input.VisualTransformation.None,
+        visualTransformation = if (family === com.intelliq.rifatplex.ui.theme.BanglaUi) LatinVisualTransformation else androidx.compose.ui.text.input.VisualTransformation.None,
         cursorBrush = SolidColor(c.primary),
         singleLine = singleLine,
         keyboardOptions = KeyboardOptions(keyboardType = keyboardType),

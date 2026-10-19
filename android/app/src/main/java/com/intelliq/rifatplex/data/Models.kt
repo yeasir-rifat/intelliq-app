@@ -147,6 +147,7 @@ data class DocSettings(
     val sectionDividerOff: Set<String> = emptySet(), // types whose 2/3-column divider line is switched off
     val sectionLineOff: Set<String> = setOf("center"), // "left" / "center" layouts whose line below the heading is off (default: centre has no line)
     val showMarks: Boolean = true, // show the [marks] badge on the right of each question / sub-question
+    val boldQuestions: Boolean = true, // question text of the six types is bold by default (can be turned back to normal per character)
     val showPageNumber: Boolean = true, // page number at the bottom of every page ("পৃষ্ঠা ১/৩" / "Page 01/03")
     val autoFix: Boolean = false, // "Document AutoFix": fill every page as fully as possible (short questions move up into gaps)
     // ----- answer-key formatting -----

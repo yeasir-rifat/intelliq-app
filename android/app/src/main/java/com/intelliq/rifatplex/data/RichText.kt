@@ -13,6 +13,9 @@ data class CharStyle(
     val underline: Boolean = false,
     val sub: Boolean = false,
     val sup: Boolean = false,
+    // Explicitly normal weight. Only meaningful while "bold question text" is on: the text is bold by default there, and
+    // this marks the characters the person turned back to normal (stored as font-weight:400).
+    val plain: Boolean = false,
     val color: Int = 0, // 0 = default colour, otherwise opaque ARGB
     // Stacked fraction payload (HTML-subset strings). Only set on the single FRAC_CHAR "atom" character.
     val fracN: String = "",
@@ -118,7 +121,10 @@ private fun applyTag(name: String, attrs: String, cur: CharStyle): CharStyle {
                 val col = parseColor(m.groupValues[1])
                 if (col != 0) s = s.copy(color = col)
             }
-            if ("font-weight" in a && ("bold" in a || "700" in a || "600" in a)) s = s.copy(bold = true)
+            if ("font-weight" in a) {
+                if ("bold" in a || "700" in a || "600" in a || "800" in a || "900" in a) s = s.copy(bold = true, plain = false)
+                else if ("normal" in a || "400" in a || "500" in a || "300" in a) s = s.copy(bold = false, plain = true)
+            }
             if ("font-style" in a && "italic" in a) s = s.copy(italic = true)
             if ("text-decoration" in a && "underline" in a) s = s.copy(underline = true)
             if ("vertical-align" in a && "sub" in a) s = s.with(Fmt.Sub, true)
@@ -265,6 +271,7 @@ fun toHtml(text: String, styles: List<CharStyle>): String {
         val s = styles[i]
         val chunk = esc(text.substring(i, j))
         if (s.color != 0) out.append("<span style=\"color:").append(String.format("#%06X", s.color and 0xFFFFFF)).append("\">")
+        if (s.plain) out.append("<span style=\"font-weight:400\">")
         if (s.bold) out.append("<b>")
         if (s.italic) out.append("<i>")
         if (s.underline) out.append("<u>")
@@ -276,6 +283,7 @@ fun toHtml(text: String, styles: List<CharStyle>): String {
         if (s.underline) out.append("</u>")
         if (s.italic) out.append("</i>")
         if (s.bold) out.append("</b>")
+        if (s.plain) out.append("</span>")
         if (s.color != 0) out.append("</span>")
         i = j
     }

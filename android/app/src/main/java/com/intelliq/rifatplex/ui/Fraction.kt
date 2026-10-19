@@ -97,19 +97,21 @@ fun RichTextView(
     bodySpan: SpanStyle? = null,
     /** Paper only: Bangla / English / formula fonts per character. */
     fonts: PaperFonts? = null,
+    /** Bold is the default weight of this text ("Bold question text"); characters marked normal stay normal. */
+    baseBold: Boolean = false,
 ) {
     val rich = remember(html) { parseHtml(html) }
     if (rich.hasFig()) {
-        FigureText(rich, modifier, color, fontFamily, fontWeight, fontSize, lineHeight, prefix, bodySpan, fonts)
+        FigureText(rich, modifier, color, fontFamily, fontWeight, fontSize, lineHeight, prefix, bodySpan, fonts, baseBold)
         return
     }
     val atoms = remember(rich) { rich.atomIndices() }
 
     if (atoms.isEmpty()) {
-        val text = remember(html, prefix, bodySpan, fonts) {
+        val text = remember(html, prefix, bodySpan, fonts, baseBold) {
             val built = buildAnnotatedString {
                 prefix?.let { append(it) }
-                val body = buildStyled(rich.text, rich.styles, SUB_SUP_SCALE)
+                val body = buildStyled(rich.text, rich.styles, SUB_SUP_SCALE, baseBold)
                 if (bodySpan != null) withStyle(bodySpan) { append(body) } else append(body)
             }
             if (fonts == null) built else fonts.apply(built)
@@ -167,7 +169,7 @@ fun RichTextView(
         }
     }
 
-    val text = remember(html, prefix, bodySpan, fonts) {
+    val text = remember(html, prefix, bodySpan, fonts, baseBold) {
         val built = buildAnnotatedString {
             prefix?.let { append(it) }
             fun body() {
@@ -175,14 +177,14 @@ fun RichTextView(
                 var k = 0
                 for (i in rich.text.indices) {
                     if (rich.isAtom(i)) {
-                        if (i > seg) append(buildStyled(rich.text.substring(seg, i), rich.styles.subList(seg, i), SUB_SUP_SCALE))
+                        if (i > seg) append(buildStyled(rich.text.substring(seg, i), rich.styles.subList(seg, i), SUB_SUP_SCALE, baseBold))
                         appendInlineContent("f$k", "�")
                         k++
                         seg = i + 1
                     }
                 }
                 if (seg < rich.text.length) {
-                    append(buildStyled(rich.text.substring(seg), rich.styles.subList(seg, rich.text.length), SUB_SUP_SCALE))
+                    append(buildStyled(rich.text.substring(seg), rich.styles.subList(seg, rich.text.length), SUB_SUP_SCALE, baseBold))
                 }
             }
             if (bodySpan != null) withStyle(bodySpan) { body() } else body()
@@ -211,6 +213,7 @@ private fun FigureText(
     prefix: AnnotatedString?,
     bodySpan: SpanStyle?,
     fonts: PaperFonts?,
+    baseBold: Boolean = false,
 ) {
     val parts = remember(rich) {
         val out = ArrayList<Any>()
@@ -246,7 +249,7 @@ private fun FigureText(
                 RichTextView(
                     part as String, Modifier.fillMaxWidth(),
                     color = color, fontFamily = fontFamily, fontWeight = fontWeight, fontSize = fontSize, lineHeight = lineHeight,
-                    prefix = prefixPending, bodySpan = bodySpan, fonts = fonts,
+                    prefix = prefixPending, bodySpan = bodySpan, fonts = fonts, baseBold = baseBold,
                 )
                 prefixPending = null
             }

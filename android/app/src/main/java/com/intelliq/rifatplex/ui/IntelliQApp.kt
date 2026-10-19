@@ -116,7 +116,7 @@ import com.intelliq.rifatplex.data.previewQuestions
 import com.intelliq.rifatplex.data.previewSetCode
 import com.intelliq.rifatplex.ui.theme.IQ
 import com.intelliq.rifatplex.ui.theme.IntelliQTheme
-import com.intelliq.rifatplex.ui.theme.NotoSerifBengali
+import com.intelliq.rifatplex.ui.theme.BanglaUi
 import com.intelliq.rifatplex.ui.theme.Poppins
 import com.intelliq.rifatplex.ui.theme.Lato
 import kotlinx.coroutines.CancellationException
@@ -310,7 +310,7 @@ fun IntelliQApp(store: AppStore, ai: AiViewModel, aiEdit: AiEditViewModel) {
     IntelliQTheme(d.dark) {
         val c = IQ.c
         SystemBars(d.dark)
-        CompositionLocalProvider(LocalLang provides lang, LocalChemAuto provides d.settings.chemAuto) {
+        CompositionLocalProvider(LocalLang provides lang, LocalChemAuto provides d.settings.chemAuto, LocalBoldQuestions provides d.settings.boldQuestions) {
             // edge-to-edge: the app fills the whole display. The colour behind the gesture/nav bar follows the page.
             Box(Modifier.fillMaxSize().background(if (pager.currentPage == 0) c.panel else c.panelSoft)) {
                 Column(
@@ -882,7 +882,7 @@ private fun LangSwitch(lang: Lang, onLang: (Lang) -> Unit) {
         horizontalArrangement = Arrangement.spacedBy(3.dp),
     ) {
         LangBtn("English", lang == Lang.EN, Lato) { onLang(Lang.EN) }
-        LangBtn("বাংলা", lang == Lang.BN, NotoSerifBengali) { onLang(Lang.BN) }
+        LangBtn("বাংলা", lang == Lang.BN, BanglaUi) { onLang(Lang.BN) }
     }
 }
 

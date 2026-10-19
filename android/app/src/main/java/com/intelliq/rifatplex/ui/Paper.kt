@@ -118,6 +118,7 @@ private class PaperStyle(
     val showExpl: Boolean = true,
     val ansLayout: String = ANS_LAYOUT_EXPL,
     val ansColor: Color = GREEN,
+    val boldQuestions: Boolean = false,
 ) {
     val family: FontFamily get() = fonts.base
 
@@ -291,6 +292,7 @@ fun PaperPages(
         showExpl = settings.showExplanation,
         ansLayout = settings.answerLayout,
         ansColor = if (settings.answerColor == ANS_COLOR_BLACK) Color(0xFF111111) else GREEN,
+        boldQuestions = settings.boldQuestions,
     )
     val size = PAGE_SIZES_MM[settings.pageSize] ?: PAGE_SIZES_MM.getValue("A4")
     val wMm = size.first
@@ -1041,7 +1043,7 @@ private fun QHead(q: Question, number: Int, st: PaperStyle, showMarks: Boolean) 
                 withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append("${formatNumber(number, st.bn)}.  ") }
             },
             color = st.color, fontFamily = st.family, fontWeight = FontWeight.Medium,
-            fontSize = st.sp(1f), lineHeight = st.sp(1.5f), fonts = st.fonts,
+            fontSize = st.sp(1f), lineHeight = st.sp(1.5f), fonts = st.fonts, baseBold = st.boldQuestions,
         )
         if (showMarks && q.marks.isNotBlank()) MarksBadge(q.marks, st)
     }

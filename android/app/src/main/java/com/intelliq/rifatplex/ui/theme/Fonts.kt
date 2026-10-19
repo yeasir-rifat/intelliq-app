@@ -22,7 +22,18 @@ val Lato = FontFamily(
     Font(R.font.lato_bolditalic, FontWeight.Bold, FontStyle.Italic),
 )
 
-/** Bangla UI font. One variable font file, every weight is a real weight (not a faked bold). */
+/**
+ * Bangla UI font: SolaimanLipi. Only a Regular file exists, so Normal and Medium use it as it is and SemiBold / Bold
+ * get the engine's synthesised bold (headings, buttons). This is a separate FontFamily instance from [SolaimanLipi]
+ * (the paper font) on purpose: the UI text wrapper recognises Bangla UI text by identity and puts Lato under the
+ * English letters and digits, which must never happen to paper text.
+ */
+val BanglaUi = FontFamily(
+    Font(R.font.solaiman_lipi, FontWeight.Normal),
+    Font(R.font.solaiman_lipi, FontWeight.Medium),
+)
+
+/** Noto Serif Bengali, kept only as a paper font choice (Settings > Font Family). One variable file, real weights. */
 @OptIn(ExperimentalTextApi::class)
 val NotoSerifBengali = FontFamily(
     listOf(400, 500, 600, 700).map { w ->
