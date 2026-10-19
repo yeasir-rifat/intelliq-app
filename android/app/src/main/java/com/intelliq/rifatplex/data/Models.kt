@@ -51,7 +51,7 @@ fun defaultSubs(): List<SubQuestion> =
 data class Question(
     val id: String,
     val text: String = "",
-    val layout: String = "vertical", // vertical | grid | horizontal
+    val layout: String = "auto", // auto | vertical | grid | horizontal
     val explanation: String = "",
     val options: List<Option> = defaultOptions(),
     val type: String = QType.MCQ,

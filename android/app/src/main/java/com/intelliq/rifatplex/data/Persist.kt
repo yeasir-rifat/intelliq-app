@@ -48,7 +48,7 @@ private fun decodeQuestion(o: JSONObject): Question {
     return Question(
         id = o.optString("id", uid("q")),
         text = o.optString("text"),
-        layout = o.optString("layout", "vertical"),
+        layout = o.optString("layout", "auto"),
         explanation = o.optString("explanation"),
         options = if (opts.isNullOrEmpty()) defaultOptions() else opts,
         type = QType.normalize(o.optString("type", QType.MCQ)),

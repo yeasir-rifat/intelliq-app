@@ -18,6 +18,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -153,7 +155,16 @@ fun QuestionCard(
                 horizontalArrangement = if (wide) Arrangement.spacedBy(6.dp) else Arrangement.spacedBy(6.dp, Alignment.End),
             ) {
                 QcBtn(PIcons.TextFormat, false, toolbarOpen, modifier = toolW(1f)) { toolbarOpen = !toolbarOpen }
-                if (wide) LayoutPicker(q.layout, Modifier.weight(2.6f)) { store.setLayout(q.id, it) }
+                if (wide) {
+                    // auto = the picker shows the layout the paper really uses for this question
+                    val measurer = rememberTextMeasurer()
+                    val density = LocalDensity.current
+                    val settings = store.data.settings
+                    val shown = if (q.layout == "auto") remember(q, settings, bn, density.density) {
+                        resolveOptionLayout(q, settings, bn, density, measurer)
+                    } else q.layout
+                    LayoutPicker(shown, Modifier.weight(2.6f)) { store.setLayout(q.id, if (q.layout == it) "auto" else it) }
+                }
                 QcBtn(PIcons.KeyboardArrowUp, false, enabled = canMoveUp, modifier = toolW(1f), onClick = onMoveUp)
                 QcBtn(PIcons.KeyboardArrowDown, false, enabled = canMoveDown, modifier = toolW(1f), onClick = onMoveDown)
                 QcBtn(PIcons.ContentCopy, false, modifier = toolW(1f)) {
@@ -227,7 +238,7 @@ private fun McqBody(q: Question, store: AppStore, bn: Boolean, onFocus: (RichHan
     }
 }
 
-/** The three option layouts of an MCQ (vertical / rectangular / horizontal). */
+/** The three option layouts of an MCQ (vertical / rectangular / horizontal). While the layout is automatic the one in use is highlighted; tapping the chosen one again goes back to automatic. */
 @Composable
 private fun LayoutPicker(current: String, modifier: Modifier = Modifier, onPick: (String) -> Unit) {
     val c = IQ.c

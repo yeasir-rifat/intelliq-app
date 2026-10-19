@@ -99,8 +99,14 @@ fun RichTextView(
     fonts: PaperFonts? = null,
     /** Bold is the default weight of this text ("Bold question text"); characters marked normal stay normal. */
     baseBold: Boolean = false,
+    /** Indent of the first line only: a leading badge sits there and wrapped lines start at the left edge. */
+    firstLineIndent: TextUnit = TextUnit.Unspecified,
 ) {
     val rich = remember(html) { parseHtml(html) }
+    val indentStyle = androidx.compose.material3.LocalTextStyle.current.let { base ->
+        if (firstLineIndent == TextUnit.Unspecified) base
+        else base.merge(TextStyle(textIndent = androidx.compose.ui.text.style.TextIndent(firstLine = firstLineIndent)))
+    }
     if (rich.hasFig()) {
         FigureText(rich, modifier, color, fontFamily, fontWeight, fontSize, lineHeight, prefix, bodySpan, fonts, baseBold)
         return
@@ -118,7 +124,7 @@ fun RichTextView(
         }
         Text(
             text, modifier, color = color, fontFamily = fontFamily, fontWeight = fontWeight,
-            fontSize = fontSize, lineHeight = lineHeight,
+            fontSize = fontSize, lineHeight = lineHeight, style = indentStyle,
         )
         return
     }
@@ -193,7 +199,7 @@ fun RichTextView(
     }
     Text(
         text, modifier, color = color, fontFamily = fontFamily, fontWeight = fontWeight,
-        fontSize = fontSize, lineHeight = fitLineHeight, inlineContent = content,
+        fontSize = fontSize, lineHeight = fitLineHeight, inlineContent = content, style = indentStyle,
     )
 }
 

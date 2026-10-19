@@ -158,19 +158,9 @@ fun aiMarkupToHtml(raw: String, chemAuto: Boolean): String {
     return buildInline(s, chemAuto, true)
 }
 
-/** Same rule as the website's computeAutoLayout. */
-fun autoLayout(q: Question): String {
-    if (q.options.any { "<fig" in it.text }) return "vertical" // pictures in options need room
-    val lens = q.options.map { plainText(it.text).trim().length }
-    val max = lens.maxOrNull() ?: 0
-    val sum = lens.sum()
-    return when {
-        sum <= 0 -> "vertical"
-        max <= 6 && sum <= 20 -> "horizontal"
-        max <= 18 && sum <= 56 -> "grid"
-        else -> "vertical"
-    }
-}
+/** The arrangement is decided when the paper is drawn (horizontal -> rectangular -> vertical, by measured width). */
+@Suppress("UNUSED_PARAMETER")
+fun autoLayout(q: Question): String = "auto"
 
 /** "bn" when the generated text contains Bangla, "en" otherwise, null when there is too little text to tell. */
 fun detectLanguage(questions: List<Question>): String? {

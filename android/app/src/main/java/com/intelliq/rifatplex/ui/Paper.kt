@@ -39,6 +39,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.TextMeasurer
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -1194,7 +1197,7 @@ private fun ItemView(item: Item, k: Int, st: PaperStyle, showAnswers: Boolean, s
                 QHead(q, item.number, st, showMarks)
                 FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalArrangement = Arrangement.spacedBy(OPT_ROW_GAP),
                 ) {
                     OptionItem(0, trKey("t.tfTrue", lang), false, st, false, label = "")
                     OptionItem(1, trKey("t.tfFalse", lang), false, st, false, label = "")
@@ -1272,21 +1275,31 @@ private fun ItemView(item: Item, k: Int, st: PaperStyle, showAnswers: Boolean, s
     }
 }
 
+/** Gap between two option rows (kept small so MCQs stay compact on the page). */
+private val OPT_ROW_GAP = 2.dp
+private val OPT_H_GAP = 16.dp   // between options of one horizontal row
+private val OPT_G_GAP = 14.dp   // between the two columns of the rectangular layout
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun OptionsBlock(q: Question, st: PaperStyle, hi: Set<Int>, k: Int) {
+    // "auto" (default): all four in one row if they fit, else 2 x 2, else one under another (measured, not guessed)
+    if (q.layout == "auto") {
+        AutoOptions(q, st, hi)
+        return
+    }
     // in 3 columns the rectangular layout becomes a single column (website `data-cols="3" .doc-options--grid`)
     val layout = if (k == 3 && q.layout == "grid") "vertical" else q.layout
     when (layout) {
         "horizontal" -> FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(OPT_H_GAP),
+            verticalArrangement = Arrangement.spacedBy(OPT_ROW_GAP),
         ) {
             q.options.forEachIndexed { i, o -> OptionItem(i, o.text, i in hi, st, false) }
         }
-        "grid" -> Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        "grid" -> Column(verticalArrangement = Arrangement.spacedBy(OPT_ROW_GAP)) {
             q.options.chunked(2).forEachIndexed { r, row ->
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(OPT_G_GAP)) {
                     row.forEachIndexed { j, o ->
                         Box(Modifier.weight(1f)) { OptionItem(r * 2 + j, o.text, (r * 2 + j) in hi, st, true) }
                     }
@@ -1294,8 +1307,135 @@ private fun OptionsBlock(q: Question, st: PaperStyle, hi: Set<Int>, k: Int) {
                 }
             }
         }
-        else -> Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        else -> Column(verticalArrangement = Arrangement.spacedBy(OPT_ROW_GAP)) {
             q.options.forEachIndexed { i, o -> OptionItem(i, o.text, i in hi, st, true) }
+        }
+    }
+}
+
+/** 1 = horizontal, 2 = rectangular, 3 = vertical (0 = no options). Estimated from the text widths. */
+private fun autoOptionMode(q: Question, st: PaperStyle, measurer: TextMeasurer, maxW: Int): Int {
+    val opts = q.options
+    if (opts.isEmpty()) return 0
+    if (opts.any { "<fig" in it.text }) return 3 // pictures in options need room
+    val d = with(st.density) { st.dp(1.152f).roundToPx() }
+    val pad = with(st.density) { (8.dp).roundToPx() }
+    val safety = with(st.density) { (4.dp).roundToPx() } // text-estimate vs real layout differences
+    val style = TextStyle(fontFamily = st.family, fontSize = st.sp(0.96f))
+    val widths = opts.map { o ->
+        val t = plainText(o.text).trim()
+        val tw = if (t.isEmpty()) 0 else measurer.measure(
+            st.fonts.apply(AnnotatedString(t)), style, softWrap = false, maxLines = 1,
+        ).size.width
+        d + pad + tw + safety
+    }
+    val hGap = with(st.density) { OPT_H_GAP.roundToPx() }
+    val gGap = with(st.density) { OPT_G_GAP.roundToPx() }
+    val total = widths.sum() + hGap * (widths.size - 1)
+    val colW = (maxW - gGap) / 2
+    return when {
+        total <= maxW -> 1
+        opts.size > 1 && widths.all { it <= colW } -> 2
+        else -> 3
+    }
+}
+
+private fun modeName(m: Int) = when (m) { 1 -> "horizontal"; 2 -> "grid"; else -> "vertical" }
+
+/**
+ * The layout the "auto" arrangement picks for [q] on the paper (page size, margins, column count and fonts of
+ * [settings]); the question card uses it to highlight the layout that is actually in use. Same rule as [AutoOptions].
+ */
+fun resolveOptionLayout(q: Question, settings: DocSettings, bn: Boolean, density: Density, measurer: TextMeasurer): String {
+    if (q.layout != "auto") return q.layout
+    val st = PaperStyle(
+        fonts = paperFonts(settings.fontFamily),
+        basePx = settings.fontSize * 96f / 72f,
+        color = Color.Black, bn = bn, density = density,
+    )
+    val size = PAGE_SIZES_MM[settings.pageSize] ?: PAGE_SIZES_MM.getValue("A4")
+    val contentW = mmDp(size.first).let { with(density) { it.roundToPx() } } - 2 * with(density) { mmDp(PAGE_MARGIN_MM).roundToPx() }
+    val k = settings.colsOf(q)
+    val gap = when (k) { 2 -> with(density) { mmDp(9f).roundToPx() }; 3 -> with(density) { mmDp(6f).roundToPx() }; else -> 0 }
+    val colW = (contentW - (k - 1) * gap) / k
+    return modeName(autoOptionMode(q, st, measurer, colW))
+}
+
+/**
+ * Smart option arrangement. The options are first measured at their natural (unwrapped) width, then:
+ *  1. every option fits in ONE row  -> horizontal,
+ *  2. else every option fits in half the width -> rectangular (2 per row, aligned columns),
+ *  3. else -> vertical (long text wraps inside its own line).
+ * Real measured widths are used, so it adapts to the font, font size, column count (1 / 2 / 3) and the content
+ * (fractions, formulas, Bangla / English) instead of a character-count guess.
+ */
+@Composable
+private fun AutoOptions(q: Question, st: PaperStyle, hi: Set<Int>) {
+    val opts = q.options
+    val measurer = rememberTextMeasurer()
+    SubcomposeLayout(Modifier.fillMaxWidth()) { constraints ->
+        val maxW = if (constraints.hasBoundedWidth) constraints.maxWidth else Int.MAX_VALUE
+        val hGap = OPT_H_GAP.roundToPx()
+        val gGap = OPT_G_GAP.roundToPx()
+        val rowGap = OPT_ROW_GAP.roundToPx()
+
+        // 1) probe: natural widths
+        val probe = subcompose("probe") {
+            opts.forEachIndexed { i, o -> OptionItem(i, o.text, i in hi, st, false) }
+        }.map { it.measure(Constraints(maxWidth = Constraints.Infinity)) }
+        val widths = probe.map { it.width }
+        val total = widths.sum() + hGap * (widths.size - 1).coerceAtLeast(0)
+        val colW = (maxW - gGap) / 2
+
+        // same decision as the question card's highlighted layout; the real widths can only make it roomier
+        val planned = if (maxW == Int.MAX_VALUE) 1 else autoOptionMode(q, st, measurer, maxW)
+        val mode = when {
+            opts.isEmpty() -> 0
+            planned == 1 && (maxW == Int.MAX_VALUE || total <= maxW) -> 1
+            planned <= 2 && opts.size > 1 && widths.all { it <= colW } -> 2
+            else -> 3
+        }
+
+        when (mode) {
+            0 -> layout(constraints.minWidth, 0) {}
+            1 -> {
+                // reuse the probe placeables: they are already measured at their natural size
+                val h = probe.maxOf { it.height }
+                val w = if (maxW == Int.MAX_VALUE) total else maxW
+                layout(w, h) {
+                    var x = 0
+                    probe.forEach { p ->
+                        p.placeRelative(x, (h - p.height) / 2)
+                        x += p.width + hGap
+                    }
+                }
+            }
+            2 -> {
+                val cells = subcompose("grid") {
+                    opts.forEachIndexed { i, o -> OptionItem(i, o.text, i in hi, st, true) }
+                }.map { it.measure(Constraints(minWidth = colW, maxWidth = colW)) }
+                val rows = cells.chunked(2)
+                val rowH = rows.map { r -> r.maxOf { it.height } }
+                layout(maxW, rowH.sum() + rowGap * (rows.size - 1)) {
+                    var y = 0
+                    rows.forEachIndexed { ri, r ->
+                        r.forEachIndexed { ci, p -> p.placeRelative(ci * (colW + gGap), y) }
+                        y += rowH[ri] + rowGap
+                    }
+                }
+            }
+            else -> {
+                val cells = subcompose("vertical") {
+                    opts.forEachIndexed { i, o -> OptionItem(i, o.text, i in hi, st, true) }
+                }.map { it.measure(Constraints(minWidth = maxW, maxWidth = maxW)) }
+                layout(maxW, cells.sumOf { it.height } + rowGap * (cells.size - 1)) {
+                    var y = 0
+                    cells.forEach { p ->
+                        p.placeRelative(0, y)
+                        y += p.height + rowGap
+                    }
+                }
+            }
         }
     }
 }
@@ -1309,7 +1449,7 @@ private fun OptionItem(
     fillText: Boolean,
     label: String = optionLabel(index, st.bn),
 ) {
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    val badge: @Composable (Modifier) -> Unit = { m ->
         OptionBadge(
             label = label,
             textColor = if (correct) Color.White else st.color,
@@ -1318,12 +1458,34 @@ private fun OptionItem(
             diameter = st.dp(1.152f),
             fill = if (correct) st.ansColor else Color.Transparent,
             stroke = if (correct) st.ansColor else st.color,
+            modifier = m,
         )
+    }
+    val weight = if (correct) FontWeight.Bold else FontWeight.Normal
+    if (fillText && "<fig" !in text) {
+        // full-width option: the badge sits at the start of the FIRST line and a long text continues on the next
+        // line from the left edge (under the badge) instead of staying in a narrow column beside it.
+        val density = LocalDensity.current
+        val d = st.dp(1.152f)
+        val indent = with(density) { (d + 8.dp).toSp() }
+        val top = ((st.dp(1.344f) - d) / 2).coerceAtLeast(0.dp)
+        Box(Modifier.fillMaxWidth()) {
+            badge(Modifier.padding(top = top))
+            RichTextView(
+                text, Modifier.fillMaxWidth(),
+                color = st.color, fontFamily = st.family, fontWeight = weight,
+                fontSize = st.sp(0.96f), lineHeight = st.sp(1.344f), fonts = st.fonts,
+                firstLineIndent = indent,
+            )
+        }
+        return
+    }
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        badge(Modifier)
         RichTextView(
             text,
             if (fillText) Modifier.weight(1f) else Modifier,
-            color = st.color, fontFamily = st.family,
-            fontWeight = if (correct) FontWeight.Bold else FontWeight.Normal,
+            color = st.color, fontFamily = st.family, fontWeight = weight,
             fontSize = st.sp(0.96f), lineHeight = st.sp(1.344f), fonts = st.fonts,
         )
     }
@@ -1339,12 +1501,13 @@ private fun OptionBadge(
     diameter: Dp,
     fill: Color,
     stroke: Color,
+    modifier: Modifier = Modifier,
 ) {
     val resolver = LocalFontFamilyResolver.current
     val typeface = remember(family) {
         resolver.resolve(family, FontWeight.Bold, FontStyle.Normal, FontSynthesis.All).value as? android.graphics.Typeface
     }
-    Canvas(Modifier.size(diameter)) {
+    Canvas(modifier.size(diameter)) {
         val strokeW = 1.dp.toPx()
         val r = size.minDimension / 2f
         drawCircle(fill, radius = r)
