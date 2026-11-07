@@ -36,8 +36,9 @@ class ReviewEdgeCasesTest {
         assertEquals((451..460).toList(), rows[2].drop(50).take(10)) // the extra rows are numbered on
         assertNotNull(own.itemAt(2, 49))
         assertNull(own.itemAt(2, 50))
-        // the key sheet prints 40 answers a page here: three QR pages
-        val pages = own.items.chunked(40).mapIndexed { i, c -> KeyQrPayload.forPage(id, 3, i, 3, c, GradingRules(2.0, 0.5))!! }
+        // the key sheet prints 40 answers a page here: 450 answers = 12 QR pages (the page count must match the real number of chunks)
+        val chunks = own.items.chunked(40)
+        val pages = chunks.mapIndexed { i, c -> KeyQrPayload.forPage(id, 3, i, chunks.size, c, GradingRules(2.0, 0.5))!! }
         val back = KeyQrPayload.assemble(pages.reversed().map { KeyQrPayload.decode(it.encode())!! }, 1L) as KeyQrAssembly.Done
         assertTrue(own.sameContent(back.snapshot))
         assertEquals(2.0, back.snapshot.marksPerQ, 0.0)

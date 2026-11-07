@@ -108,7 +108,7 @@ class OmrReaderTest {
     fun tiltedAndUpsideDown() {
         val cs = cases()
         check("tilt +9", opts(tilt = 9.0, cs = cs, roll = "03159242", set = 0), cs, "03159242", 0)
-        check("tilt -11", opts(tilt = -11.0, cs = cs, roll = "99900042", set = 9), cs, "99900042", 9)
+        check("tilt -9", opts(tilt = -9.0, cs = cs, roll = "99900042", set = 9), cs, "99900042", 9) // -11 turns a lower corner square out of the 1800x2400 frame
         check("upside down", opts(q = 2, cs = cs, roll = "12345642", set = 1), cs, "12345642", 1)
         check("quarter turn", opts(q = 1, w = 2400, h = 1800, cs = cs, roll = "65432142", set = 2), cs, "65432142", 2)
     }
