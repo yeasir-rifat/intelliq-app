@@ -49,21 +49,33 @@ data class KeyItem(val printedNumber: Int, val correct: Set<Int>) {
     fun matches(marked: Set<Int>): Boolean = correct.isNotEmpty() && marked == correct
 }
 
-/** Fewer than one sheet still prints one sheet; every 50 answers start another. */
-fun omrSheetCount(mcqCount: Int): Int =
-    if (mcqCount <= 0) 1 else (mcqCount + OmrGeometry.ROWS_PER_PAGE - 1) / OmrGeometry.ROWS_PER_PAGE
+/** Fewer than one sheet still prints one sheet; every [sheetRows] (50, 100 or 200) answers start another. */
+fun omrSheetCount(mcqCount: Int, sheetRows: Int = 200): Int {
+    val rows = OmrSheetKind.ofRows(sheetRows).rows
+    return if (mcqCount <= 0) 1 else (mcqCount + rows - 1) / rows
+}
 
 /**
- * The rows of every OMR sheet: the printed numbers of the MCQs, 50 per sheet. A sheet is always full (50 rows): the
- * rows after the last MCQ are simply numbered on, so 20 MCQs still give a 50-row sheet. Those extra rows have no
+ * The rows of every OMR sheet: the printed numbers of the MCQs, [sheetRows] (50, 100 or 200) per sheet. A sheet is always
+ * full: the rows after the last MCQ are simply numbered on, so 20 MCQs still give a full sheet. Those extra rows have no
  * [KeyItem]; a scanner must ignore them.
  */
-fun omrRows(numbers: List<Int>): List<List<Int>> {
-    val rows = OmrGeometry.ROWS_PER_PAGE
+fun omrRows(numbers: List<Int>, sheetRows: Int = 200): List<List<Int>> {
+    val rows = OmrSheetKind.ofRows(sheetRows).rows
     if (numbers.isEmpty()) return listOf(emptyList())
     return numbers.chunked(rows).map { c ->
         if (c.size >= rows) c else c + (1..(rows - c.size)).map { c.last() + it }
     }
+}
+
+/**
+ * How many rows of sheet [page] (0-based) hold a real MCQ, the rest are the numbered-on extra rows of the last sheet
+ * ([omrRows] pads it). The printer fades those rows so a student does not fill them; the scanner ignores them anyway
+ * (AnswerKeySnapshot.itemAt gives null).
+ */
+fun omrLiveRows(mcqCount: Int, sheetRows: Int, page: Int): Int {
+    val rows = OmrSheetKind.ofRows(sheetRows).rows
+    return (mcqCount - page * rows).coerceIn(0, rows)
 }
 
 data class AnswerKeySnapshot(
@@ -71,7 +83,7 @@ data class AnswerKeySnapshot(
     /** 0..9 = position among the named sets (same as the QR code), null = the paper has no sets. */
     val setIndex: Int?,
     val geomVersion: Int,
-    /** Sorted by printed number. Item number i sits on sheet i / 50, row i % 50 (see [itemAt]). */
+    /** Sorted by printed number. Item number i sits on sheet i / rows, row i % rows (see [itemAt]; rows = 50, 100 or 200). */
     val items: List<KeyItem>,
     val marksPerQ: Double,
     val negativePerWrong: Double,
@@ -80,12 +92,16 @@ data class AnswerKeySnapshot(
     val storeKey: String get() = AnswerKey.keyOf(examId, setIndex)
 
     /** Number of printed OMR sheets of this set. */
-    val sheets: Int get() = omrSheetCount(items.size)
+    val sheets: Int get() = omrSheetCount(items.size, sheetKind.rows)
+
+    /** The sheet size this key was made for (from [geomVersion]; unknown versions count as 200). */
+    internal val sheetKind: OmrSheetKind get() = OmrSheetKind.ofVersion(geomVersion) ?: OmrSheetKind.DEFAULT
 
     /** The MCQ that sits in row [slot] (0..49, left block first) of sheet [page] (0-based); null for a blank extra row. */
     fun itemAt(page: Int, slot: Int): KeyItem? {
-        if (page < 0 || slot < 0 || slot >= OmrGeometry.ROWS_PER_PAGE) return null
-        return items.getOrNull(page * OmrGeometry.ROWS_PER_PAGE + slot)
+        val rows = sheetKind.rows
+        if (page < 0 || slot < 0 || slot >= rows) return null
+        return items.getOrNull(page * rows + slot)
     }
 
     /** MCQs without a right option marked (they are not counted when checking). */
@@ -137,12 +153,13 @@ object AnswerKey {
         numbers: Map<String, Int>,
         rules: GradingRules,
         now: Long = System.currentTimeMillis(),
+        sheetRows: Int = 200,
     ): AnswerKeySnapshot {
         val r = rules.sane()
         return AnswerKeySnapshot(
             examId = examId,
             setIndex = setIndex,
-            geomVersion = OmrGeometry.VERSION,
+            geomVersion = OmrSheetKind.ofRows(sheetRows).geomVersion,
             items = printedMcqs(questions, numbers).map { (n, q) -> KeyItem(n, correctPositions(q)) },
             marksPerQ = r.marksPerQ,
             negativePerWrong = r.negativePerWrong,

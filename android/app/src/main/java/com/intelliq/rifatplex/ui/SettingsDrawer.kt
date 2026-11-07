@@ -98,6 +98,7 @@ import com.intelliq.rifatplex.data.OMR_AUTO
 import com.intelliq.rifatplex.data.OMR_CUSTOM
 import androidx.activity.compose.BackHandler
 import com.intelliq.rifatplex.data.OmrSettings
+import com.intelliq.rifatplex.data.formatNumber
 import com.intelliq.rifatplex.ui.theme.DOC_FONTS_BN
 import com.intelliq.rifatplex.ui.theme.DOC_FONTS_EN
 import com.intelliq.rifatplex.ui.theme.IQ
@@ -1046,6 +1047,17 @@ private fun OmrSection(d: AppData, store: AppStore) {
     val bn = LocalLang.current == Lang.BN
     fun set(f: (OmrSettings) -> OmrSettings) = store.setSettings { s -> s.copy(omr = f(s.omr)) }
     Section(bottomPad = 14.dp) {
+        // sheet size: 50, 100 or 200 answers per sheet (valid for the automatic and the custom sheet)
+        SubHead(tr("settings.omr.size"))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+            Segmented(
+                listOf(50, 100, 200).map { it.toString() to formatNumber(it, bn) },
+                o.sheetKind.toString(),
+                Modifier.weight(1f),
+            ) { v -> set { it.copy(sheetKind = v.toIntOrNull() ?: 200) } }
+            InfoTip(tr("settings.omr.sizeInfo"))
+        }
+        Spacer(Modifier.height(12.dp))
         // the explanation is a tip beside the switch, not a line of text under it
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
             Segmented(
@@ -1068,14 +1080,11 @@ private fun OmrSection(d: AppData, store: AppStore) {
         SubHeadSpaced(tr("settings.omr.header"))
         OmrInput(tr("settings.omr.board"), o.boardName, auto1.ifEmpty { tr("settings.omr.autoText") }) { v -> set { it.copy(boardName = v) } }
         OmrInput(tr("settings.omr.exam"), o.examLine, auto2.ifEmpty { tr("settings.omr.autoText") }) { v -> set { it.copy(examLine = v) } }
-        CheckRow(tr("settings.omr.year"), o.showYear) { v -> set { it.copy(showYear = v) } }
-        if (o.showYear) {
-            Column(Modifier.padding(top = 8.dp, start = 28.dp)) {
-                InputBox(o.yearPrefix, { v -> set { it.copy(yearPrefix = v.take(4)) } }, tr("settings.omr.yearPrefix"), singleLine = true)
-            }
-        }
         Spacer(Modifier.height(12.dp))
         OmrInput(tr("settings.omr.sheetTitle"), o.sheetTitle, dflt("omr.sheetName")) { v -> set { it.copy(sheetTitle = v) } }
+        Box(Modifier.padding(vertical = 10.dp)) {
+            CheckRow(tr("settings.omr.sizeTag"), o.showSizeTag) { v -> set { it.copy(showSizeTag = v) } }
+        }
         OmrBlockRow(
             tr("settings.omr.banner1"), o.showBanner1, o.banner1, dflt("omr.banner1"),
             { v -> set { it.copy(showBanner1 = v) } }, { v -> set { it.copy(banner1 = v) } },
@@ -1106,15 +1115,11 @@ private fun OmrSection(d: AppData, store: AppStore) {
         OmrBlockRow(
             tr("settings.omr.reg"), o.showReg, o.regLabel, dflt("omr.reg"),
             { v -> set { it.copy(showReg = v) } }, { v -> set { it.copy(regLabel = v) } },
-        ) { OmrDigits(tr("settings.omr.digits"), o.regDigits, 12) { v -> set { it.copy(regDigits = v) } } }
+        ) { OmrDigits(tr("settings.omr.digits"), o.regDigits, 2) { v -> set { it.copy(regDigits = v) } } }
         OmrBlockRow(
             tr("settings.omr.subject"), o.showSubject, o.subjectLabel, dflt("omr.subject"),
             { v -> set { it.copy(showSubject = v) } }, { v -> set { it.copy(subjectLabel = v) } },
-        ) { OmrDigits(tr("settings.omr.digits"), o.subjectDigits, 4) { v -> set { it.copy(subjectDigits = v) } } }
-        OmrBlockRow(
-            tr("settings.omr.marks"), o.showMarks, o.marksLabel, dflt("omr.marks"),
-            { v -> set { it.copy(showMarks = v) } }, { v -> set { it.copy(marksLabel = v) } },
-        )
+        ) { OmrDigits(tr("settings.omr.digits"), o.subjectDigits, 2) { v -> set { it.copy(subjectDigits = v) } } }
         OmrBlockRow(
             tr("settings.omr.invig"), o.showInvigilator, o.invigilatorLabel, dflt("omr.invig"),
             { v -> set { it.copy(showInvigilator = v) } }, { v -> set { it.copy(invigilatorLabel = v) } },
@@ -1127,19 +1132,12 @@ private fun OmrSection(d: AppData, store: AppStore) {
             { v -> set { it.copy(showNote = v) } }, { v -> set { it.copy(note = v) } },
         )
         OmrBlockRow(
-            tr("settings.omr.rules"), o.showRules, o.rulesTitle, dflt("omr.rules"),
-            { v -> set { it.copy(showRules = v) } }, { v -> set { it.copy(rulesTitle = v) } },
-        ) {
-            Spacer(Modifier.height(10.dp))
-            InputBox(o.rules, { v -> set { it.copy(rules = v) } }, tr("settings.omr.rulesHint"), minLines = 5)
-        }
-        OmrBlockRow(
             tr("settings.omr.signature"), o.showSignature, o.signatureLabel, dflt("omr.sigStudent"),
             { v -> set { it.copy(showSignature = v) } }, { v -> set { it.copy(signatureLabel = v) } },
         )
 
         IQButton(tr("settings.omr.reset"), BtnKind.Ghost, Modifier.fillMaxWidth()) {
-            set { OmrSettings(mode = OMR_CUSTOM) }
+            set { OmrSettings(mode = OMR_CUSTOM, sheetKind = it.sheetKind) }
         }
     }
 }

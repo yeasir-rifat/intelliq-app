@@ -31,6 +31,8 @@ import com.intelliq.rifatplex.data.OmrReadParams
 import com.intelliq.rifatplex.data.OmrReader
 import com.intelliq.rifatplex.data.OmrResult
 import com.intelliq.rifatplex.data.OmrSheetRead
+import com.intelliq.rifatplex.data.OmrSizeMismatch
+import com.intelliq.rifatplex.data.sizeMismatchOf
 import com.intelliq.rifatplex.data.QrStatus
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -70,6 +72,8 @@ internal data class EvalSheet(
     val rollFix: String? = null,
     val result: OmrResult? = null,
     val flags: Set<OmrFlag> = emptySet(),
+    /** Set together with [OmrFlag.KEY_SIZE_MISMATCH]: the size of this sheet and of the saved answer key (for the message). */
+    val sizeMismatch: OmrSizeMismatch? = null,
     val state: EvalState,
     val ms: Long = 0,
 ) {
@@ -79,7 +83,7 @@ internal data class EvalSheet(
 
 private fun OmrSheetRead.withRows(rows: List<BubbleSet>) = OmrSheetRead(
     qr = qr, rows = rows, roll = roll, reg = reg, subject = subject, setColumn = setColumn, setFilled = setFilled,
-    paperLevel = paperLevel, inkLevel = inkLevel, lowContrast = lowContrast, outOfImage = outOfImage, millis = millis,
+    paperLevel = paperLevel, inkLevel = inkLevel, lowContrast = lowContrast, outOfImage = outOfImage, millis = millis, kind = kind,
 )
 
 /**
@@ -398,7 +402,7 @@ internal class OmrEvalViewModel : ViewModel() {
         val rd = rd0.withRows(rd0.rows.map { OmrReader.classify(it.darkness, p) })
         // the teacher photographed a page of the answer sheet: there is nothing to mark, whatever exam is on screen
         if (rd.qr is QrStatus.KeyPage) {
-            return s.copy(result = null, flags = LinkedHashSet<OmrFlag>().apply { add(OmrFlag.QR_KEY_PAGE) }, state = EvalState.UNMATCHED)
+            return s.copy(result = null, flags = LinkedHashSet<OmrFlag>().apply { add(OmrFlag.QR_KEY_PAGE) }, sizeMismatch = null, state = EvalState.UNMATCHED)
         }
         val qr = rd.qrPayload
         val examId = qr?.examId ?: fallbackExam
@@ -406,7 +410,10 @@ internal class OmrEvalViewModel : ViewModel() {
         val snaps = if (examId != null && store != null) store.forExam(examId) else emptyList()
         val pick = OmrGrade.pickSnapshot(snaps, qr?.setIndex, rd.setFilled)
         val page = qr?.page ?: 0
-        val snap = pick.snapshot?.takeIf { page < it.sheets }
+        // a key made for another sheet size (50 / 100 / 200) cannot grade this sheet: its rows are laid out differently
+        val sizeMismatch = qr != null && pick.snapshot != null && qr.geomVersion != pick.snapshot.geomVersion
+        val sizes = sizeMismatchOf(qr, pick.snapshot) // both sizes known: the message names them
+        val snap = pick.snapshot?.takeIf { !sizeMismatch && page < it.sheets }
         if (snap == null) {
             val fl = LinkedHashSet<OmrFlag>(pick.flags)
             when (rd.qr) {
@@ -416,8 +423,10 @@ internal class OmrEvalViewModel : ViewModel() {
                 is QrStatus.KeyPage -> fl += OmrFlag.QR_KEY_PAGE
                 is QrStatus.Found -> {}
             }
-            if (examId == null || pick.snapshot != null) fl += OmrFlag.NO_SNAPSHOT
-            return s.copy(result = null, flags = fl, state = EvalState.UNMATCHED)
+            // a key of a known but different size gets its own message; a key of an unknown (old) version stays "other version"
+            if (sizeMismatch) fl += if (sizes != null) OmrFlag.KEY_SIZE_MISMATCH else OmrFlag.QR_OTHER_VERSION
+            if (examId == null || (pick.snapshot != null && !sizeMismatch)) fl += OmrFlag.NO_SNAPSHOT
+            return s.copy(result = null, flags = fl, sizeMismatch = sizes.takeIf { sizeMismatch }, state = EvalState.UNMATCHED)
         }
         val m = parseRuleNumber(marksText)
         val n = parseRuleNumber(negText)
@@ -425,7 +434,7 @@ internal class OmrEvalViewModel : ViewModel() {
         val res = OmrGrade.grade(rd, snap, page, qr?.pages ?: 1, rules, GradeOptions(penalizeMulti), s.overrides, pick.flags)
         var fl = res.flags - OmrFlag.KEY_INCOMPLETE // a teacher's key problem, not a problem of this sheet
         if (s.rollFix != null) fl = fl - OmrFlag.ROLL_INCOMPLETE
-        return s.copy(result = res, flags = res.flags, state = if (fl.isEmpty()) EvalState.OK else EvalState.REVIEW)
+        return s.copy(result = res, flags = res.flags, sizeMismatch = null, state = if (fl.isEmpty()) EvalState.OK else EvalState.REVIEW)
     }
 
     companion object {

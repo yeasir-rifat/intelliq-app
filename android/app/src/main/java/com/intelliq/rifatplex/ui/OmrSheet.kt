@@ -24,14 +24,20 @@ import com.intelliq.rifatplex.data.DigitGridSpec
 import com.intelliq.rifatplex.data.DocFields
 import com.intelliq.rifatplex.data.OmrGeometry
 import com.intelliq.rifatplex.data.OmrSettings
+import com.intelliq.rifatplex.data.OmrSheetKind
 import com.intelliq.rifatplex.data.QrCode
 import com.intelliq.rifatplex.data.QrPayload
+import com.intelliq.rifatplex.data.RectMm
 import com.intelliq.rifatplex.data.formatNumber
 import com.intelliq.rifatplex.data.SheetStyle
 import com.intelliq.rifatplex.ui.theme.Kalpurush
 import com.intelliq.rifatplex.ui.theme.TimesNewRoman
 
 /*
+ * 200-answer OMR sheet (A4, geometry version 2): header with two title lines, exam-code / centre / roll / set grids,
+ * name / district / signature / invigilator boxes, QR code, then FIVE blocks of 40 answers. No third-party branding.
+ * (The comment below describes the old 50-answer sheet this file used to draw; the numbers now come from OmrGeometry.)
+ *
  * OMR bubble sheet (A4), laid out like the SSC / HSC board answer sheet. Everything is drawn on ONE Canvas in
  * millimetres, so the preview and the PDF are identical and the bubbles keep their exact size and place whatever the
  * phone's screen density is (a scanner needs that).
@@ -51,9 +57,8 @@ import com.intelliq.rifatplex.ui.theme.TimesNewRoman
  * change every text, show / hide every block and set the digits of the roll, registration and subject code.
  */
 
-/** Answers per sheet: 2 blocks of 25. More MCQs continue on the next sheet. */
+/** Answers on the biggest sheet (200: 5 blocks of 40). The user can also choose 100 (4 x 25) or 50 (2 x 25), see OmrSheetKind. */
 internal const val OMR_ROWS_PER_PAGE = OmrGeometry.ROWS_PER_PAGE
-private const val OMR_ROWS_PER_BLOCK = OmrGeometry.ROWS_PER_BLOCK
 private const val OMR_OPTIONS = OmrGeometry.OPTIONS
 private const val OMR_PAGE_W_MM = OmrGeometry.PAGE_W_MM
 
@@ -65,7 +70,10 @@ private const val PT_MM = 0.35278f // 1 pt in mm
 // ---- drawing-only values (mm)
 private const val FRAME_SW = 0.13f // hairline of every frame
 private const val RING_SW = OmrGeometry.RING_STROKE // stroke of a bubble
-private const val TINT = 0.10f
+private const val TINT = 0.08f
+
+/** Opacity of the number and bubbles of the extra rows after the last MCQ (see [OmrPage] liveRows): pale, so nobody fills them. */
+private const val UNUSED_ALPHA = 0.28f
 
 // ---- measured geometry: since step 4.1 the numbers live in data/OmrGeometry.kt (the scanner reads the same ones)
 private const val RING_R = OmrGeometry.RING_R
@@ -75,7 +83,6 @@ private const val HALF_BAND = OmrGeometry.HALF_BAND
 private const val BLOCK_W = OmrGeometry.BLOCK_W
 private const val QNUM_W = OmrGeometry.QNUM_W
 private const val GRID_BOX_ROW = OmrGeometry.GRID_BOX_ROW
-private val ANS_Y = OmrGeometry.ANS_Y
 
 private class OmrFaces(val bn: Typeface, val bnBold: Typeface, val en: Typeface, val enBold: Typeface)
 
@@ -133,8 +140,9 @@ private class OmrText(private val nc: android.graphics.Canvas, private val k: Fl
 }
 
 /**
- * One OMR sheet. [numbers] are the 50 question numbers of this sheet (rows past the last MCQ are numbered on, so the
- * sheet is always full). [setCodes] are the set names offered in the (blank) set-code column. [omr] is the OMR setting
+ * One OMR sheet. [numbers] are the question numbers of this sheet, 50, 100 or 200 as chosen in the OMR setting (rows past the last MCQ are numbered on, so the
+ * sheet is always full). Only the first [liveRows] rows (counting block after block) hold a real MCQ; the number and the bubbles of the
+ * later rows are drawn pale, so a student does not fill them (the scanner ignores them anyway). [setCodes] are the set names offered in the (blank) set-code column. [omr] is the OMR setting
  * of the document: automatic or custom.
  */
 @Composable
@@ -150,30 +158,31 @@ internal fun OmrPage(
     modifier: Modifier = Modifier,
     /** What the QR code of this sheet says (step 4.2); null = no QR code is printed. */
     qr: QrPayload? = null,
+    /** Rows with a real MCQ on this sheet; the default means every row is real. */
+    liveRows: Int = Int.MAX_VALUE,
 ) {
     val bn = lang == Lang.BN
     val faces = rememberOmrFaces()
     val qrMatrix = remember(qr) { qr?.let { QrCode.encode(it.encode()) } }
     fun t(key: String) = trKey(key, lang)
     val o = omr.effective()
+    val kind = OmrSheetKind.ofRows(o.sheetKind) // 50, 100 or 200 answers on this sheet
     fun pick(custom: String, key: String) = custom.trim().ifEmpty { t(key) }
 
     // ---- texts: automatic from the document + branding, custom ones win when filled in
     val brandName = if (brand.enabled && brand.showName) brand.name.trim() else ""
     val autoLine1 = brandName.ifEmpty { doc.title.trim() }
     val autoLine2 = (if (brandName.isNotEmpty()) listOf(doc.title.trim(), doc.subtitle.trim()) else listOf(doc.subtitle.trim()))
-        .filter { it.isNotEmpty() }.joinToString(" • ")
+        .filter { it.isNotEmpty() }.joinToString(" \u2022 ")
     val line1 = o.boardName.trim().ifEmpty { autoLine1 }
     val line2 = o.examLine.trim().ifEmpty { autoLine2 }
     val sheetTitle = pick(o.sheetTitle, "omr.sheetName")
-    val banner1 = pick(o.banner1, "omr.banner1")
-    val banner2 = pick(o.banner2, "omr.banner")
-    val rules = o.rules.lines().map { it.trim() }.filter { it.isNotEmpty() }.take(6)
-        .ifEmpty { (1..5).map { t("omr.rule$it") } }
+    val noMark = pick(o.banner1, "omr.banner1")
+    val banner = pick(o.banner2, "omr.banner")
+    val cap = pick(o.note, "omr.note")
     val optionLabels = if (bn) listOf("ক", "খ", "গ", "ঘ", "ঙ") else listOf("A", "B", "C", "D", "E")
     val setLabels = setCodes.map { it.trim() }.filter { it.isNotEmpty() }.take(10).ifEmpty { optionLabels.take(4) }
     val pageLabel = if (pageCount > 1) "${t("doc.page")} ${formatNumber(pageIndex + 1, bn)}/${formatNumber(pageCount, bn)}" else ""
-    fun digitsIn(s: String) = if (bn) s.map { if (it in '0'..'9') '০' + (it - '0') else it }.joinToString("") else s
 
     Canvas(modifier) {
         val k = size.width / OMR_PAGE_W_MM
@@ -189,23 +198,19 @@ internal fun OmrPage(
         fun line(x1: Float, y1: Float, x2: Float, y2: Float, sw: Float = FRAME_SW, c: Color = OMR_INK) =
             drawLine(c, Offset(mm(x1), mm(y1)), Offset(mm(x2), mm(y2)), strokeWidth = mm(sw))
 
-        fun bubble(cx: Float, cy: Float, label: String) {
-            drawCircle(OMR_INK, mm(RING_R), Offset(mm(cx), mm(cy)), style = Stroke(mm(RING_SW)))
-            text.draw(label, cx, cy, 6.5f, OMR_INK, maxW = 2.4f)
+        fun bubble(cx: Float, cy: Float, label: String, r: Float, pt: Float, alpha: Float = 1f) {
+            drawCircle(OMR_INK.copy(alpha = alpha), mm(r), Offset(mm(cx), mm(cy)), style = Stroke(mm(RING_SW)))
+            text.draw(label, cx, cy, pt, OMR_INK.copy(alpha = alpha), maxW = r * 1.6f)
         }
 
         /** Label box on top of a block: outline + black title. */
-        fun labelBox(x: Float, y: Float, w: Float, h: Float, label: String, pt: Float = 10f) {
-            rect(x, y, w, h)
-            text.draw(label, x + w / 2f, y + h / 2f, pt, OMR_BLACK, maxW = w - 2f)
+        fun labelBox(r: RectMm, label: String, pt: Float = 8f) {
+            rect(r.x, r.y, r.w, r.h)
+            text.draw(label, r.x + r.w / 2f, r.y + r.h / 2f, pt, OMR_BLACK, bold = true, maxW = r.w - 1.2f)
         }
 
-        /**
-         * A digit grid: a row of write-in boxes on top and one bubble column per column of [spec] (the positions come
-         * from [OmrGeometry]). [labelsOf] gives the bubble labels of every column, [tinted] says which columns carry the
-         * pink tint. Returns the bottom y of the frame.
-         */
-        fun digitGrid(spec: DigitGridSpec, labelsOf: (Int) -> List<String>, tinted: (Int) -> Boolean): Float {
+        /** A digit grid: a row of write-in boxes on top and one bubble column per column of [spec]. */
+        fun digitGrid(spec: DigitGridSpec, labelsOf: (Int) -> List<String>, tinted: (Int) -> Boolean) {
             val cols = spec.cols
             val gx = spec.gx
             val gy = spec.gy
@@ -226,20 +231,16 @@ internal fun OmrPage(
             for (c in 0 until cols) line(gx + xs[c], gy + spec.colHeight(c), gx + xs[c + 1], gy + spec.colHeight(c))
             for (c in 0 until cols) labelsOf(c).forEachIndexed { i, lab ->
                 val p = spec.bubble(c, i)
-                bubble(p.x, p.y, lab)
+                bubble(p.x, p.y, lab, OmrGeometry.GRID_RING_R, 5.5f)
             }
-            return spec.bottom
         }
-        // the digits of the roll / registration / subject grids are always 0-9 (as on the reference sheet)
         val digitLabels = (0..9).map { it.toString() }
 
-        // ---- scanner marks: four corner squares
+        // ---- scanner marks: four corner squares + timing dashes down the left edge between the two left squares
         OmrGeometry.cornerMarks().forEach { r -> fillRect(r.x, r.y, r.w, r.h, OMR_BLACK) }
-        // ---- timing dashes: 52 of them, down the whole left edge, independent of the number of answers
         OmrGeometry.timingDashes().forEach { r -> fillRect(r.x, r.y, r.w, r.h, OMR_BLACK) }
 
         // ---- QR code: black modules only, in ONE path (no hairline gaps between the rows, vector in the PDF).
-        // The 18 mm box keeps a white quiet zone of 2 mm around the 14 mm code; the scanner looks in the same box.
         if (qrMatrix != null) {
             val box = OmrGeometry.qrBox()
             val mod = OmrGeometry.QR_CODE_MM / qrMatrix.size
@@ -252,163 +253,99 @@ internal fun OmrPage(
             drawPath(path, OMR_BLACK)
         }
 
-        // ---- header
-        if (line1.isNotEmpty()) text.draw(line1, 105f, 18.5f, SheetStyle.HEADING_PT, OMR_BLACK, bold = true, maxW = 165f)
-        run { // exam line centred on the page, the year boxes follow it
-            val boxW = 4.95f
-            val boxes = if (o.showYear) 4 else 0
-            val gap = if (line2.isNotEmpty() && boxes > 0) 1.0f else 0f
-            val textMax = 2f * (86f - gap - boxes * boxW)
-            val tw = if (line2.isEmpty()) 0f else minOf(text.width(line2, SheetStyle.SUBHEADING_PT, true), textMax)
-            if (line2.isNotEmpty()) text.draw(line2, 105f - tw / 2f, 25.3f, SheetStyle.SUBHEADING_PT, OMR_BLACK, bold = true, align = Paint.Align.LEFT, maxW = textMax)
-            val bx0 = if (line2.isEmpty()) 105f - boxes * boxW / 2f else 105f + tw / 2f + gap
-            val prefix = digitsIn(o.yearPrefix.trim()).take(boxes)
-            for (i in 0 until boxes) {
-                val bx = bx0 + i * boxW
-                rect(bx, 22.72f, boxW, 5.08f, 0.25f, OMR_BLACK)
-                prefix.getOrNull(i)?.let { text.draw(it.toString(), bx + boxW / 2f, 25.3f, 10f, OMR_BLACK, bold = true) }
-            }
+        // ---- header: two title lines, the sheet title as a pink badge on the right
+        if (line1.isNotEmpty()) text.draw(line1, 105f, 9.5f, SheetStyle.HEADING_PT, OMR_BLACK, bold = true, maxW = 90f)
+        if (line2.isNotEmpty()) text.draw(line2, 105f, 17.0f, SheetStyle.SUBHEADING_PT, OMR_BLACK, bold = true, maxW = 90f)
+        fillRect(152f, 5f, 43f, 6.5f, OMR_INK)
+        text.draw(sheetTitle, 173.5f, 8.25f, 7.5f, Color.White, bold = true, maxW = 41f)
+        // sheet size ("৫০ প্রশ্ন" / "50 Questions") in the top-left corner: the title lines start at x 60, the grids at y 29, the scanner marks are far below
+        if (o.showSizeTag) {
+            text.draw(t("omr.sizeTag").replace("{n}", formatNumber(kind.rows, bn)), 15f, 8.25f, 7.5f, OMR_BLACK, bold = true, align = Paint.Align.LEFT, maxW = 38f)
         }
-        text.draw(sheetTitle, 105f, 30.5f, SheetStyle.SUBHEADING_PT, OMR_BLACK, bold = true, maxW = OmrGeometry.TITLE_MAX_W) // keeps clear of the QR box
         if (o.showBanner1) {
-            fillRect(49.14f, 33.97f, 111.38f, 5.46f, OMR_INK)
-            text.draw(banner1, 104.83f, 36.7f, 8f, Color.White, bold = true, maxW = 109f)
+            rect(80f, 20.5f, 50f, 6.5f, 0.25f)
+            text.draw(noMark, 105f, 23.75f, 7f, OMR_BLACK, maxW = 48f)
         }
-        if (o.showBanner2) { // the outlined box also frames the pink banner above it
-            val by = if (o.showBanner1) 33.9f else 39.43f
-            rect(49.14f, by, 111.38f, 45.2f - by, FRAME_SW, OMR_BLACK)
-            text.draw(banner2, 104.83f, 42.3f, 9f, OMR_BLACK, bold = true, maxW = 109f)
-        }
-        if (pageLabel.isNotEmpty()) text.draw(pageLabel, 105f, 290.5f, 7f, OMR_INK)
 
-        // ---- answer blocks: always 25 rows each
+        // ---- grids: exam code, centre code, roll number, set code
+        val subjectGrid = OmrGeometry.subjectGrid(o)
+        if (subjectGrid != null) {
+            labelBox(subjectGrid.labelBox, pick(o.subjectLabel, "omr.subject"))
+            digitGrid(subjectGrid, { digitLabels }, { it % 2 == 0 })
+        }
+        val regGrid = OmrGeometry.regGrid(o)
+        if (regGrid != null) {
+            labelBox(regGrid.labelBox, pick(o.regLabel, "omr.reg"))
+            digitGrid(regGrid, { digitLabels }, { it % 2 == 0 })
+        }
+        val rollGrid = OmrGeometry.rollGrid(o)
+        if (rollGrid != null) {
+            labelBox(rollGrid.labelBox, pick(o.rollLabel, "omr.roll"))
+            digitGrid(rollGrid, { digitLabels }, { it % 2 == 0 })
+        }
+        val setGrid = OmrGeometry.setGrid(o, setCodes)
+        if (setGrid != null) {
+            labelBox(setGrid.labelBox, pick(o.setLabel, "omr.set"))
+            digitGrid(setGrid, { setLabels }, { true })
+        }
+
+        // ---- name / district / signature / invigilator boxes
+        fun writeBox(r: RectMm, label: String, hint: String, lineAt: Float) {
+            rect(r.x, r.y, r.w, r.h)
+            line(r.x + 6f, r.y + r.h * lineAt, r.x + r.w - 6f, r.y + r.h * lineAt, 0.2f, OMR_INK)
+            text.draw(label, r.x + r.w / 2f, r.y + r.h * (lineAt + 0.17f), 8f, OMR_BLACK, maxW = r.w - 3f)
+            if (hint.isNotEmpty()) text.draw(hint, r.x + r.w / 2f, r.y + r.h * (lineAt + 0.35f), 6.5f, OMR_BLACK, maxW = r.w - 3f)
+        }
+        writeBox(OmrGeometry.NAME_BOX, t("omr.name"), t("omr.nameHint"), 0.5f)
+        writeBox(OmrGeometry.DISTRICT_BOX, t("omr.district"), t("omr.districtHint"), 0.45f)
+        if (o.showSignature) writeBox(OmrGeometry.SIGN_BOX, pick(o.signatureLabel, "omr.sigStudent"), "", 0.55f)
+        if (o.showInvigilator) {
+            val r = OmrGeometry.INVIG_BOX
+            rect(r.x, r.y, r.w, r.h)
+            text.drawDown(pick(o.invigilatorLabel, "omr.invig"), r.x + r.w / 2f, r.y + r.h / 2f, 7f, OMR_BLACK, maxW = r.h - 3f)
+        }
+
+        // ---- lower "do not mark" box + the two instruction lines (left of the QR code)
+        if (o.showBanner1) {
+            rect(70f, 78f, 50f, 7f, 0.25f)
+            text.draw(noMark, 95f, 81.5f, 7f, OMR_BLACK, maxW = 48f)
+        }
+        if (o.showBanner2) text.draw("($banner)", 95f, 89.2f, 6.8f, OMR_BLACK, maxW = 92f)
+        if (o.showNote) text.draw(cap, 95f, 93.4f, 6.8f, OMR_BLACK, maxW = 92f)
+
+        // ---- answer blocks: 200 = five blocks of 40 rows, 100 = four blocks of 25, 50 = two blocks of 25 (same table height)
         val qHead = pick(o.qHeader, "omr.qNo")
         val aHead = pick(o.ansHeader, "omr.answer")
-        fun answerBlock(block: Int, nums: List<Int>) {
-            if (nums.isEmpty()) return
-            val x0 = OmrGeometry.BLOCK_X[block]
-            val bottom = ANS_Y[nums.size - 1] + HALF_BAND
-            nums.indices.forEach { i ->
-                val cy = ANS_Y[i]
-                if (o.shading) { // every answer has its own pink band, the gap between two answers stays white
-                    val y0 = maxOf(cy - HALF_BAND, HEAD_BOTTOM)
-                    fillRect(x0, y0, BLOCK_W, cy + HALF_BAND - y0, OMR_INK.copy(alpha = TINT))
-                    if (i == 0) fillRect(x0 + QNUM_W, y0, BLOCK_W - QNUM_W, cy + HALF_BAND - y0, OMR_INK.copy(alpha = TINT)) // darker first band
-                } else if (i > 0) line(x0, (cy + ANS_Y[i - 1]) / 2f, x0 + BLOCK_W, (cy + ANS_Y[i - 1]) / 2f, 0.12f, OMR_INK.copy(alpha = 0.35f))
+        val rowsPerBlock = kind.rowsPerBlock
+        val pitch = OmrGeometry.rowPitch(kind)
+        for (block in 0 until kind.blocks) {
+            val nums = numbers.drop(block * rowsPerBlock).take(rowsPerBlock)
+            val x0 = OmrGeometry.blockX(kind, block)
+            val bottom = OmrGeometry.TABLE_BOTTOM
+            if (o.shading) for (i in 0 until rowsPerBlock) if (i % 2 == 1) {
+                fillRect(x0, HEAD_BOTTOM + pitch * i, BLOCK_W, pitch, OMR_INK.copy(alpha = TINT))
             }
+            for (i in 1 until rowsPerBlock) line(x0, HEAD_BOTTOM + pitch * i, x0 + BLOCK_W, HEAD_BOTTOM + pitch * i, 0.1f, OMR_INK.copy(alpha = 0.7f))
             rect(x0, HEAD_TOP, BLOCK_W, bottom - HEAD_TOP)
             line(x0, HEAD_BOTTOM, x0 + BLOCK_W, HEAD_BOTTOM)
             line(x0 + QNUM_W, HEAD_TOP, x0 + QNUM_W, bottom)
             val qLines = qHead.split('\n')
             qLines.forEachIndexed { li, s ->
-                val dy = (li - (qLines.size - 1) / 2f) * 2.7f
-                text.draw(s.trim(), x0 + QNUM_W / 2f, HEAD_TOP + (HEAD_BOTTOM - HEAD_TOP) / 2f + dy, 5.5f, OMR_BLACK, bold = true, maxW = QNUM_W - 0.8f)
+                val dy = (li - (qLines.size - 1) / 2f) * 2.2f
+                text.draw(s.trim(), x0 + QNUM_W / 2f, HEAD_TOP + (HEAD_BOTTOM - HEAD_TOP) / 2f + dy, if (qLines.size > 1) 4.5f else 6.5f, OMR_BLACK, bold = true, maxW = QNUM_W - 0.8f)
             }
-            text.draw(aHead, x0 + QNUM_W + (BLOCK_W - QNUM_W) / 2f, HEAD_TOP + (HEAD_BOTTOM - HEAD_TOP) / 2f, 12f, OMR_BLACK, maxW = BLOCK_W - QNUM_W - 2f)
+            text.draw(aHead, x0 + QNUM_W + (BLOCK_W - QNUM_W) / 2f, HEAD_TOP + (HEAD_BOTTOM - HEAD_TOP) / 2f, 8f, OMR_BLACK, bold = true, maxW = BLOCK_W - QNUM_W - 2f)
             nums.forEachIndexed { i, n ->
-                val cy = ANS_Y[i]
-                text.draw(formatNumber(n, bn), x0 + QNUM_W / 2f, cy, 7.5f, OMR_BLACK, bold = true, maxW = QNUM_W - 0.8f)
+                val cy = OmrGeometry.ansY(kind, i)
+                val fade = if (block * rowsPerBlock + i < liveRows) 1f else UNUSED_ALPHA // extra row after the last MCQ
+                text.draw(formatNumber(n, bn), x0 + QNUM_W / 2f, cy, 7f, OMR_BLACK.copy(alpha = fade), bold = true, maxW = QNUM_W - 0.8f)
                 for (op in 0 until OMR_OPTIONS) {
-                    val p = OmrGeometry.answerBubble(block, i, op)
-                    bubble(p.x, p.y, optionLabels[op])
+                    val p = OmrGeometry.answerBubble(kind, block, i, op)
+                    bubble(p.x, p.y, optionLabels[op], OmrGeometry.RING_R, 6f, fade)
                 }
             }
         }
-        val first = numbers.take(OMR_ROWS_PER_BLOCK)
-        val second = numbers.drop(OMR_ROWS_PER_BLOCK).take(OMR_ROWS_PER_BLOCK)
-        answerBlock(0, first)
-        answerBlock(1, second)
 
-        // ---- roll number
-        val rollGrid = OmrGeometry.rollGrid(o)
-        if (rollGrid != null) {
-            val lb = rollGrid.labelBox
-            labelBox(lb.x, lb.y, lb.w, lb.h, pick(o.rollLabel, "omr.roll"))
-            digitGrid(rollGrid, { digitLabels }, { it % 2 == 0 })
-        }
-
-        // ---- set code: blank, the candidate fills the bubble of the set (only the middle column has bubbles)
-        var setBottom = HEAD_BOTTOM
-        val setGrid = OmrGeometry.setGrid(o, setCodes)
-        if (setGrid != null) {
-            val lb = setGrid.labelBox
-            labelBox(lb.x, lb.y, lb.w, lb.h, pick(o.setLabel, "omr.set"))
-            setBottom = digitGrid(setGrid, { c -> if (c == 1) setLabels else emptyList() }, { it == 1 })
-        }
-
-        // ---- marks box (the examiner writes the marks), only when there is room under the set code
-        if (o.showMarks) {
-            val my = maxOf(92.77f, setBottom + 4f)
-            val mh = 122.87f - my
-            if (mh >= 16f) {
-                rect(148.7f, my, 16.12f, mh)
-                line(159.12f, my, 159.12f, my + mh)
-                text.drawDown(pick(o.marksLabel, "omr.marks"), 159.12f + 2.85f, my + mh / 2f, 8f, OMR_BLACK, maxW = mh - 2f)
-            }
-        }
-
-        // ---- invigilator box
-        if (o.showInvigilator) {
-            val h = 122.87f - HEAD_TOP
-            rect(171.68f, HEAD_TOP, 19.44f, h)
-            line(185.4f, HEAD_TOP, 185.4f, HEAD_TOP + h)
-            text.drawDown(pick(o.invigilatorLabel, "omr.invig"), 185.4f + 2.85f, HEAD_TOP + h / 2f, 8f, OMR_BLACK, maxW = h - 3f)
-        }
-
-        // ---- registration number
-        val regGrid = OmrGeometry.regGrid(o)
-        if (regGrid != null) {
-            val lb = regGrid.labelBox
-            labelBox(lb.x, lb.y, lb.w, lb.h, pick(o.regLabel, "omr.reg"))
-            digitGrid(regGrid, { digitLabels }, { it % 2 == 0 })
-        }
-
-        // ---- subject code: the first digit only goes 0..3 on a three-digit code (its frame ends under the 3)
-        val subjectGrid = OmrGeometry.subjectGrid(o)
-        if (subjectGrid != null) {
-            val lb = subjectGrid.labelBox
-            labelBox(lb.x, lb.y, lb.w, lb.h, pick(o.subjectLabel, "omr.subject"))
-            digitGrid(subjectGrid, { c -> digitLabels.take(subjectGrid.labelCounts[c]) }, { it % 2 == 0 })
-        }
-
-        // ---- note + instructions (both centred on x 143.3 like the reference)
-        if (o.showNote) {
-            text.draw(pick(o.note, "omr.note"), 143.3f, 208.85f, 10f, OMR_INK, maxW = 63.5f)
-            line(111.5f, 212.05f, 175.0f, 212.05f, FRAME_SW)
-        }
-        if (o.showRules) {
-            val ix = 102.5f
-            val iw = 88.6f
-            fillRect(132.7f, 214.5f, 21.6f, 6.7f, OMR_INK)
-            text.draw(pick(o.rulesTitle, "omr.rules"), 143.5f, 217.85f, 11f, Color.White, maxW = 19f)
-            val y0 = 226.35f
-            val pitch = 5.87f
-            rules.forEachIndexed { i, r ->
-                val slot = if (i == 0) 0 else i + 1 // the filling example sits under rule 1
-                text.draw("${formatNumber(i + 1, bn)}. $r", ix, y0 + slot * pitch, 6.8f, OMR_BLACK, align = Paint.Align.LEFT, maxW = iw)
-            }
-            // how to fill: one correct and four wrong marks
-            val ey = y0 + pitch
-            text.draw(t("omr.correct"), 106.7f, ey, 6.8f, OMR_BLACK, bold = true, align = Paint.Align.LEFT, maxW = 15.5f)
-            drawCircle(OMR_BLACK, mm(1.8f), Offset(mm(124.8f), mm(ey)))
-            text.draw(t("omr.wrong"), 133f, ey, 6.8f, OMR_BLACK, bold = true, align = Paint.Align.LEFT, maxW = 13.5f)
-            val wx = listOf(148.8f, 155.7f, 162.6f, 169.4f)
-            wx.forEachIndexed { i, x ->
-                drawCircle(OMR_INK, mm(1.8f), Offset(mm(x), mm(ey)), style = Stroke(mm(RING_SW)))
-                text.draw(optionLabels[i], x, ey, 6.5f, OMR_INK, maxW = 2.6f)
-            }
-            line(wx[0] - 1.0f, ey + 0.9f, wx[0] + 1.0f, ey - 0.9f, 0.5f, OMR_INK) // slash across the letter
-            drawCircle(OMR_BLACK, mm(0.9f), Offset(mm(wx[1]), mm(ey))) // small blob
-            line(wx[2] - 1.0f, ey + 0.1f, wx[2] - 0.3f, ey + 1.0f, 0.4f, OMR_INK) // tick
-            line(wx[2] - 0.3f, ey + 1.0f, wx[2] + 1.2f, ey - 1.1f, 0.4f, OMR_INK)
-            line(wx[3] - 1.2f, ey - 1.2f, wx[3] + 1.2f, ey + 1.2f, 0.45f, OMR_BLACK) // cross
-            line(wx[3] - 1.2f, ey + 1.2f, wx[3] + 1.2f, ey - 1.2f, 0.45f, OMR_BLACK)
-        }
-
-        // ---- candidate signature (off by default: the reference sheet has none; custom mode can switch it on)
-        if (o.showSignature) {
-            line(120f, 268.5f, 178f, 268.5f, 0.25f, OMR_BLACK)
-            text.draw(pick(o.signatureLabel, "omr.sigStudent"), 149f, 272f, 7f, OMR_BLACK, maxW = 56f)
-        }
+        if (pageLabel.isNotEmpty()) text.draw(pageLabel, 105f, 285.8f, 7f, OMR_INK)
     }
 }

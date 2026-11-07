@@ -6,7 +6,7 @@ package com.intelliq.rifatplex.data
  *
  *  - [examId]       permanent id of the exam ([ExamId])
  *  - [setIndex]     0..9 = the sheet belongs to that set (position among the named sets); null = no set, written `-`
- *  - [geomVersion]  [OmrGeometry.VERSION] the sheet was printed with
+ *  - [geomVersion]  the layout the sheet was printed with: 2 = 200 answers, 3 = 100, 4 = 50 ([OmrSheetKind])
  *  - [page]/[pages] 0-based number of this sheet and the number of sheets (51+ MCQs give more than one sheet)
  *
  * The roll number is NOT in the code: every student gets the same sheet and writes the roll in the grid.
@@ -36,10 +36,10 @@ data class QrPayload(
                 page in 0 until pages
 
         /** The payload of one printed sheet, or null when a value is out of range (no QR is printed then). */
-        fun forSheet(examId: String, setIndex: Int?, page: Int, pages: Int): QrPayload? =
-            if (valid(examId, setIndex, OmrGeometry.VERSION, page, pages)) {
-                QrPayload(examId, setIndex, OmrGeometry.VERSION, page, pages)
-            } else null
+        fun forSheet(examId: String, setIndex: Int?, page: Int, pages: Int, sheetRows: Int = 200): QrPayload? {
+            val v = OmrSheetKind.ofRows(sheetRows).geomVersion // 200 -> 2, 100 -> 3, 50 -> 4
+            return if (valid(examId, setIndex, v, page, pages)) QrPayload(examId, setIndex, v, page, pages) else null
+        }
 
         /** Does the text look like one of our codes (any version)? Lets the scanner say "other version of the sheet". */
         fun isIntelliQ(text: String): Boolean = text.startsWith("IQ")

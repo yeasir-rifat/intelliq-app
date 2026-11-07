@@ -8,7 +8,7 @@ import kotlin.math.sin
 
 /**
  * Test helper (step 4.4): draws what the RED channel of a photo of the OMR sheet looks like, from OmrGeometry alone:
- * paper light grey, the 4 corner squares and 52 timing dashes black. The magenta print (bubbles, boxes, letters) is
+ * paper light grey, the 4 corner squares and 40 timing dashes black. The magenta print (bubbles, boxes, letters) is
  * white in the red channel, so it is left out on purpose. Optional clutter (black text blobs, pen strokes), shadow,
  * a dark table around the sheet, blur and noise make the picture hostile.
  */
@@ -32,7 +32,7 @@ internal class SyntheticOptions(
     val blurPx: Int = 0,
     val noise: Double = 0.0,
     val seed: Long = 1,
-    /** timing dashes (0..51) left out, as if a thumb covered them */
+    /** timing dashes (0..39) left out, as if a thumb covered them */
     val eraseDashes: List<Int> = emptyList(),
     /** Step 4.5: pen marks (filled discs, grey value 0..255 in the red channel). */
     val discs: List<SynDisc> = emptyList(),

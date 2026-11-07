@@ -169,10 +169,13 @@ const val OMR_CUSTOM = "custom" // every text, block and size chosen by the user
  */
 data class OmrSettings(
     val mode: String = OMR_AUTO,
+    /** Answers on one sheet: 50, 100 or 200 (any other value counts as 200). Applies to the automatic sheet too. */
+    val sheetKind: Int = 200,
     // ----- header texts
     val boardName: String = "", // big first line (auto: institution name, else the exam title)
     val examLine: String = "", // second line, before the year boxes (auto: exam title / subject)
     val sheetTitle: String = "", // "নৈর্ব্যক্তিক অভীক্ষার উত্তরপত্র"
+    val showSizeTag: Boolean = true, // small "৫০ প্রশ্ন" / "100 Questions" in the top-left corner of the sheet (the automatic sheet always prints it)
     val banner1: String = "", // pink banner
     val banner2: String = "", // boxed banner
     val showYear: Boolean = true, // year boxes after the exam line
@@ -182,23 +185,23 @@ data class OmrSettings(
     // ----- answer blocks
     val qHeader: String = "", // "প্র. নং"
     val ansHeader: String = "", // "উত্তর"
-    val shading: Boolean = true, // every second answer row tinted
+    val shading: Boolean = false, // every second answer row tinted
     // ----- blocks on the right (label, switch, digits)
-    val showRoll: Boolean = true, val rollLabel: String = "", val rollDigits: Int = 6,
+    val showRoll: Boolean = true, val rollLabel: String = "", val rollDigits: Int = 8,
     val showSet: Boolean = true, val setLabel: String = "",
-    val showReg: Boolean = true, val regLabel: String = "", val regDigits: Int = 10,
-    val showSubject: Boolean = true, val subjectLabel: String = "", val subjectDigits: Int = 3,
+    val showReg: Boolean = true, val regLabel: String = "", val regDigits: Int = 1,
+    val showSubject: Boolean = true, val subjectLabel: String = "", val subjectDigits: Int = 2,
     val showMarks: Boolean = true, val marksLabel: String = "",
     val showInvigilator: Boolean = true, val invigilatorLabel: String = "",
     // ----- bottom
     val showNote: Boolean = true, val note: String = "",
     val showRules: Boolean = true, val rulesTitle: String = "", val rules: String = "", // one rule per line
-    val showSignature: Boolean = false, val signatureLabel: String = "",
+    val showSignature: Boolean = true, val signatureLabel: String = "",
 ) {
     val isCustom: Boolean get() = mode == OMR_CUSTOM
 
     /** What the sheet really uses: the automatic sheet ignores every custom value. */
-    fun effective(): OmrSettings = if (isCustom) this else OmrSettings()
+    fun effective(): OmrSettings = if (isCustom) this else OmrSettings(sheetKind = sheetKind)
 }
 
 const val ANS_COLOR_GREEN = "green"

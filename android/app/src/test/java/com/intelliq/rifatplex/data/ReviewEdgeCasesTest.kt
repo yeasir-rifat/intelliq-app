@@ -26,16 +26,16 @@ class ReviewEdgeCasesTest {
     }
 
     @Test
-    fun hundredTwentyMcqsAreThreeSheetsAndThreeKeyPagesThatAssembleBack() {
-        val qs = (1..120).map { mcq(it, it % 4) }
+    fun fiveHundredFiftyMcqsAreThreeSheetsAndKeyPagesThatAssembleBack() {
+        val qs = (1..450).map { mcq(it, it % 4) }
         val numbers = qs.associate { it.id to it.id.drop(1).toInt() }
         val own = AnswerKey.build(id, 3, qs, numbers, GradingRules(2.0, 0.5), now = 1L)
         assertEquals(3, own.sheets)
         val rows = omrRows(own.items.map { it.printedNumber })
-        assertEquals(listOf(50, 50, 50), rows.map { it.size })
-        assertEquals((121..130).toList(), rows[2].drop(20).take(10)) // the extra rows are numbered on
-        assertNotNull(own.itemAt(2, 19))
-        assertNull(own.itemAt(2, 20))
+        assertEquals(listOf(200, 200, 200), rows.map { it.size })
+        assertEquals((451..460).toList(), rows[2].drop(50).take(10)) // the extra rows are numbered on
+        assertNotNull(own.itemAt(2, 49))
+        assertNull(own.itemAt(2, 50))
         // the key sheet prints 40 answers a page here: three QR pages
         val pages = own.items.chunked(40).mapIndexed { i, c -> KeyQrPayload.forPage(id, 3, i, 3, c, GradingRules(2.0, 0.5))!! }
         val back = KeyQrPayload.assemble(pages.reversed().map { KeyQrPayload.decode(it.encode())!! }, 1L) as KeyQrAssembly.Done

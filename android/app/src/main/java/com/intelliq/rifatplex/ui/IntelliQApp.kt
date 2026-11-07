@@ -1036,6 +1036,11 @@ private fun PreviewPanel(
                 SquareBtn(36.dp, { store.setZoom(d.zoom + 10) }) { Icon(TIcons.ZoomIn, null, Modifier.size(20.dp), tint = c.textSecondary) }
             }
 
+            // OMR preview only: quick sheet size (the same setting as Settings > OMR sheet); the preview and its page count follow at once
+            if (kind == DocKind.OMR) {
+                OmrSizeChips(d.settings.omr.sheetKind) { v -> store.setSettings { s -> s.copy(omr = s.omr.copy(sheetKind = v)) } }
+            }
+
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
                 if (d.setCode.enabled && d.generatedSets.isNotEmpty()) {
                     Select(
@@ -1092,6 +1097,9 @@ private fun PreviewPanel(
                 }) { Icon(TIcons.Reset, null, Modifier.size(20.dp), tint = c.textSecondary) }
             }
         }
+
+        // size hint for the OMR sheet (only a hint, the size is never changed by it)
+        if (kind == DocKind.OMR) OmrSizeHint(omrMcqCount(d), lang)
 
         // workspace
         BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {

@@ -15,15 +15,15 @@ class OmrGradeTest {
         return BubbleSet(d, state, m.toSet())
     }
 
-    private fun sheet(rows: Map<Int, BubbleSet>, roll: String = "123456", qr: QrStatus = QrStatus.Found(QrPayload(id, 0, 1, 0, 1)), lowContrast: Boolean = false): OmrSheetRead {
-        val all = (0 until 50).map { rows[it] ?: row(MarkState.BLANK) }
+    private fun sheet(rows: Map<Int, BubbleSet>, roll: String = "123456", qr: QrStatus = QrStatus.Found(QrPayload(id, 0, 2, 0, 1)), lowContrast: Boolean = false): OmrSheetRead {
+        val all = (0 until 200).map { rows[it] ?: row(MarkState.BLANK) }
         return OmrSheetRead(
             qr, all, DigitsRead(roll, emptyList()), null, null, null, null, 220.0, 30.0, lowContrast, 0, 0,
         )
     }
 
     private fun snap(n: Int, correct: (Int) -> Set<Int> = { setOf(it % 4) }, set: Int? = 0, marks: Double = 1.0, neg: Double = 0.0) =
-        AnswerKeySnapshot(id, set, 1, (1..n).map { KeyItem(it, correct(it - 1)) }, marks, neg, 0L)
+        AnswerKeySnapshot(id, set, OmrGeometry.VERSION, (1..n).map { KeyItem(it, correct(it - 1)) }, marks, neg, 0L)
 
     @Test
     fun basicScore() {
@@ -92,13 +92,15 @@ class OmrGradeTest {
 
     @Test
     fun secondSheetUsesItsOwnItems() {
-        val s = snap(60)
-        val read = sheet(mapOf(0 to row(MarkState.FILLED, 0)), qr = QrStatus.Found(QrPayload(id, 0, 1, 1, 2)))
-        val r = OmrGrade.grade(read, s) // page 1 comes from the QR code: items 51..60
+        val s = snap(210)
+        val read = sheet(mapOf(0 to row(MarkState.FILLED, 0)), qr = QrStatus.Found(QrPayload(id, 0, 2, 1, 2)))
+        val r = OmrGrade.grade(read, s) // page 1 comes from the QR code: items 201..210
         assertEquals(10, r.rows.size)
-        assertEquals(51, r.rows[0].printedNumber)
+        assertEquals(201, r.rows[0].printedNumber)
         assertEquals(2, r.pages)
-        assertEquals(QStatus.WRONG, r.rows[0].status) // Q51's right option is (50 % 4) = 2
+        assertEquals(QStatus.CORRECT, r.rows[0].status) // Q201's right option is (200 % 4) = 0 and the student marked option 0
+        val wrong = OmrGrade.grade(sheet(mapOf(0 to row(MarkState.FILLED, 1)), qr = QrStatus.Found(QrPayload(id, 0, 2, 1, 2))), s)
+        assertEquals(QStatus.WRONG, wrong.rows[0].status) // option 1 is not Q201's answer
     }
 
     @Test

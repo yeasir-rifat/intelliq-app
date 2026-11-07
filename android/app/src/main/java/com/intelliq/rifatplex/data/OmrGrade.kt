@@ -35,6 +35,9 @@ internal enum class OmrFlag {
     /** No snapshot of this exam / set on this device. */
     NO_SNAPSHOT,
 
+    /** The sheet's QR code names one sheet size (50 / 100 / 200) but the saved answer key was made for another. */
+    KEY_SIZE_MISMATCH,
+
     /** The roll number has a column that is not clearly filled. */
     ROLL_INCOMPLETE,
     LOW_CONTRAST,
@@ -47,7 +50,21 @@ internal enum class OmrFlag {
     KEY_INCOMPLETE,
 }
 
-/** What one question of the sheet came to. [slot] = row of the sheet (0..49). */
+/** The two sheet sizes (rows: 50 / 100 / 200) of a [OmrFlag.KEY_SIZE_MISMATCH]: the photographed sheet and the saved answer key. */
+internal data class OmrSizeMismatch(val sheetRows: Int, val keyRows: Int)
+
+/**
+ * The sizes when the sheet's QR code and the answer key [snap] are of two KNOWN, different sheet sizes; null when there is no
+ * QR code or key, the sizes agree, or one of the versions is not a known size (an old version-1 key stays "other version").
+ */
+internal fun sizeMismatchOf(qr: QrPayload?, snap: AnswerKeySnapshot?): OmrSizeMismatch? {
+    if (qr == null || snap == null || qr.geomVersion == snap.geomVersion) return null
+    val sheet = OmrSheetKind.ofVersion(qr.geomVersion) ?: return null
+    val key = OmrSheetKind.ofVersion(snap.geomVersion) ?: return null
+    return OmrSizeMismatch(sheet.rows, key.rows)
+}
+
+/** What one question of the sheet came to. [slot] = row of the sheet (0 until 50 / 100 / 200). */
 internal class QResult(
     val printedNumber: Int,
     val slot: Int,
@@ -79,6 +96,8 @@ internal class OmrResult(
     /** The marking rules this result was graded with (typed rules or the exam's saved ones). */
     val marksPerQ: Double = 1.0,
     val negativePerWrong: Double = 0.0,
+    /** The sheet size the rows belong to (needed to find the bubbles again on the photo). */
+    val kind: OmrSheetKind = OmrSheetKind.DEFAULT,
 ) {
     val correct: Int get() = rows.count { it.status == QStatus.CORRECT }
     val wrong: Int get() = rows.count { it.status == QStatus.WRONG }
@@ -138,7 +157,7 @@ internal object OmrGrade {
         var score = 0.0
         var total = 0.0
         var keyIncomplete = false
-        for (slot in 0 until OmrGeometry.ROWS_PER_PAGE) {
+        for (slot in read.rows.indices) {
             val item = snap.itemAt(page, slot) ?: continue // extra row of the last sheet
             val row = read.rows[slot]
             val ov = overrides[slot]
@@ -193,6 +212,7 @@ internal object OmrGrade {
             flags = flags,
             marksPerQ = r.marksPerQ,
             negativePerWrong = r.negativePerWrong,
+            kind = read.kind,
         )
     }
 }

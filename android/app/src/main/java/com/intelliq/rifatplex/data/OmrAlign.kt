@@ -1,6 +1,7 @@
 package com.intelliq.rifatplex.data
 
 import kotlin.math.abs
+import kotlin.math.ln
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -21,9 +22,9 @@ import kotlin.math.sqrt
  *  2. adaptive threshold with an integral image (window = 1/10 of the width): shadows and uneven light are harmless.
  *  3. the four corner squares: connected dark blobs in the four quarters of the photo that are square and solid; of the
  *     candidates the combination that forms a sensible A4 quadrilateral wins.
- *  4. rotation: the 52 timing dashes are only on the LEFT edge. For each of the 4 ways to name the corners, count the
+ *  4. rotation: the 40 timing dashes are only on the LEFT edge. For each of the 4 ways to name the corners, count the
  *     dashes found where that guess predicts them; the best guess is the true orientation (upside-down photos work).
- *  5. refine: measure the real centre of every dash and fit one homography to 4 corners + up to 52 dashes (weighted
+ *  5. refine: measure the real centre of every dash and fit one homography to 4 corners + up to 40 dashes (weighted
  *     least squares), throw out dashes that disagree, fit again.
  *  6. quality gate: scale, number of dashes and fit error, each with its own failure reason.
  *
@@ -271,7 +272,7 @@ internal class OmrAlignParams(
     /** Pixels per millimetre needed (in the photo as given), see README step 4.2 (section 2, 3). */
     val minScalePxPerMm: Double = 6.0,
     /** Timing dashes that must be found, of OmrGeometry.TIMING_COUNT. */
-    val minDashes: Int = 48,
+    val minDashes: Int = 36,
     /** Largest accepted root-mean-square error of the fit, in mm. */
     val maxFitRmsMm: Double = 0.5,
     /** Dashes that miss the fitted position by more than this are dropped from the fit (mm). */
@@ -306,7 +307,7 @@ internal object OmrAlign {
     /** Sheet corner indices (as in OmrGeometry.cornerMarks: TL, TR, BL, BR) in clockwise order. */
     private val SHEET_CLOCKWISE = intArrayOf(0, 1, 3, 2)
 
-    private const val WEIGHT_CORNER = 8.0
+    private const val WEIGHT_CORNER = 40.0 // the 4 squares carry the fit; the dashes (one edge only) must not bend it
 
     /** Aligns [img] (red channel of the photo, upright as the viewer shows it). */
     fun align(img: GrayImage, params: OmrAlignParams = OmrAlignParams()): AlignResult = run(img, null, params)
@@ -625,8 +626,8 @@ internal object OmrAlign {
         val hor = (top + bottom) / 2
         val ver = (right + left) / 2
         val aspect = max(hor, ver) / min(hor, ver)
-        if (aspect !in 1.15..1.9) return null // the marks of the sheet are 177.6 x 262.9 mm apart (1.48)
-        val scale = max(hor, ver) / (OmrGeometry.PAGE_H_MM - 2 * 14.659 - OmrGeometry.MARK_SIZE) // px per mm, roughly
+        if (aspect !in 1.0..1.6) return null // the marks of the sheet are 189.2 x 195.4 mm apart (1.03); a tilted photo stretches it
+        val scale = max(hor, ver) / max(OmrGeometry.MARKS_SPAN_X, OmrGeometry.MARKS_SPAN_Y).toDouble() // px per mm, roughly
         val expected = OmrGeometry.MARK_SIZE * scale
         for (b in q) if (b.side < expected * 0.5 || b.side > expected * 1.8) return null
         var area = 0.0
@@ -636,7 +637,9 @@ internal object OmrAlign {
             area += a.x * b.y - b.x * a.y
         }
         area = abs(area) / 2
-        return q.sumOf { it.score } + 3.0 * area / (img.w.toDouble() * img.h)
+        // a stray dark blob in the header would make a bigger, more stretched quad: prefer the printed 1.03 shape
+        val shapePenalty = 1.5 * min(1.0, abs(ln(aspect / OmrGeometry.MARKS_ASPECT.toDouble())))
+        return q.sumOf { it.score } + 3.0 * area / (img.w.toDouble() * img.h) - shapePenalty
     }
 
     // ---- 4/5. timing dashes -------------------------------------------------------------------------------------

@@ -89,7 +89,7 @@ private fun encodeSettings(st: DocSettings): JSONObject {
 }
 
 private fun encodeOmr(m: OmrSettings): JSONObject = JSONObject()
-    .put("mode", m.mode)
+    .put("mode", m.mode).put("sheetKind", m.sheetKind).put("showSizeTag", m.showSizeTag)
     .put("boardName", m.boardName).put("examLine", m.examLine).put("sheetTitle", m.sheetTitle)
     .put("banner1", m.banner1).put("banner2", m.banner2)
     .put("showYear", m.showYear).put("yearPrefix", m.yearPrefix)
@@ -110,6 +110,8 @@ private fun decodeOmr(o: JSONObject?): OmrSettings {
     val d = OmrSettings()
     return OmrSettings(
         mode = o.optString("mode", d.mode).takeIf { it == OMR_CUSTOM } ?: OMR_AUTO,
+        sheetKind = o.optInt("sheetKind", d.sheetKind).takeIf { it == 50 || it == 100 || it == 200 } ?: d.sheetKind,
+        showSizeTag = o.optBoolean("showSizeTag", d.showSizeTag),
         boardName = o.optString("boardName"), examLine = o.optString("examLine"), sheetTitle = o.optString("sheetTitle"),
         banner1 = o.optString("banner1"), banner2 = o.optString("banner2"),
         showYear = o.optBoolean("showYear", true), yearPrefix = o.optString("yearPrefix", d.yearPrefix).take(4),
@@ -119,9 +121,9 @@ private fun decodeOmr(o: JSONObject?): OmrSettings {
         rollDigits = o.optInt("rollDigits", d.rollDigits).coerceIn(1, 8),
         showSet = o.optBoolean("showSet", true), setLabel = o.optString("setLabel"),
         showReg = o.optBoolean("showReg", true), regLabel = o.optString("regLabel"),
-        regDigits = o.optInt("regDigits", d.regDigits).coerceIn(1, 12),
+        regDigits = o.optInt("regDigits", d.regDigits).coerceIn(1, 2),
         showSubject = o.optBoolean("showSubject", true), subjectLabel = o.optString("subjectLabel"),
-        subjectDigits = o.optInt("subjectDigits", d.subjectDigits).coerceIn(1, 4),
+        subjectDigits = o.optInt("subjectDigits", d.subjectDigits).coerceIn(1, 2),
         showMarks = o.optBoolean("showMarks", true), marksLabel = o.optString("marksLabel"),
         showInvigilator = o.optBoolean("showInvigilator", true), invigilatorLabel = o.optString("invigilatorLabel"),
         showNote = o.optBoolean("showNote", true), note = o.optString("note"),

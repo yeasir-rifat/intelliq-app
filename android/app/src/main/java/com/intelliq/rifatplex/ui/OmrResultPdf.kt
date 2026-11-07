@@ -11,6 +11,7 @@ import android.graphics.pdf.PdfDocument
 import androidx.core.content.res.ResourcesCompat
 import com.intelliq.rifatplex.R
 import com.intelliq.rifatplex.data.OmrGeometry
+import com.intelliq.rifatplex.data.OmrSheetKind
 import com.intelliq.rifatplex.data.OmrLayout
 import com.intelliq.rifatplex.data.OmrReport
 import com.intelliq.rifatplex.data.QResult
@@ -69,7 +70,7 @@ internal object OmrResultPdf {
             val al = s.align
             if (al != null) {
                 drawFieldBorders(c, al, layout, s, k)
-                drawMarks(c, al, res.rows, 0f, 0f, k)
+                drawMarks(c, al, res.rows, 0f, 0f, k, res.kind)
                 drawScore(c, al, layout, num(res.score) + "/" + num(res.total), face, k)
             }
             if (s.state == EvalState.OK) drawTick(c, PAGE_W.toFloat(), pageH.toFloat())
@@ -203,10 +204,10 @@ internal object OmrResultPdf {
     }
 
     /** Same marks as the detail screen: [k] = PDF points per photo pixel, (left, top) = where the photo starts on the page. */
-    private fun drawMarks(c: Canvas, al: com.intelliq.rifatplex.data.AlignResult.Ok, rows: List<QResult>, left: Float, top: Float, k: Float) {
+    private fun drawMarks(c: Canvas, al: com.intelliq.rifatplex.data.AlignResult.Ok, rows: List<QResult>, left: Float, top: Float, k: Float, kind: OmrSheetKind) {
         val r = (OmrGeometry.BUBBLE_INNER_R * al.scalePxPerMm * k).toFloat().coerceAtLeast(1.5f)
         fun ring(color: Int, rad: Float, slot: Int, o: Int) {
-            val b = OmrGeometry.answerBubbleOfSlot(slot, o)
+            val b = OmrGeometry.answerBubbleOfSlot(kind, slot, o)
             val p = al.toImage.map(b.x.toDouble(), b.y.toDouble())
             c.drawCircle(left + (p.x * k).toFloat(), top + (p.y * k).toFloat(), rad, Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 this.color = color

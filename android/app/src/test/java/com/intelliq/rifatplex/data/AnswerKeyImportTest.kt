@@ -73,7 +73,7 @@ class AnswerKeyImportTest {
     @Test
     fun otherPicturesAreClassified() {
         assertTrue(AnswerKeyImport.classify(null) is KeyScan.None)
-        assertTrue(AnswerKeyImport.classify("IQ1;K7M2QX9A;2;1;0;1") is KeyScan.NotKey)
+        assertTrue(AnswerKeyImport.classify("IQ1;K7M2QX9A;2;2;0;1") is KeyScan.NotKey)
         assertTrue(AnswerKeyImport.classify("https://example.com") is KeyScan.NotKey)
         assertTrue(AnswerKeyImport.classify("IQK2:K7M2QX9A") is KeyScan.OtherVersion)
         assertTrue(AnswerKeyImport.readImage(GrayImage(300, 300, ByteArray(300 * 300) { 0xFF.toByte() })) is KeyScan.None)

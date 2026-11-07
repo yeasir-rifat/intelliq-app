@@ -19,7 +19,7 @@ import kotlin.math.max
  * How a bubble is measured
  *  - window: a disc of radius windowFactor x BUBBLE_INNER_R (0.75 x 1.53 = 1.15 mm) around the centre. The printed ring and the
  *    printed letter are magenta, i.e. white in the red channel, so an empty bubble is paper-white and a pen mark is dark.
- *  - search: the disc is also tried at +-0.4 mm (0.2 mm steps) and the DARKEST position counts, so a small shift of the print or
+ *  - search: the disc is also tried at +-0.6 mm (0.2 mm steps) and the DARKEST position counts, so a small shift of the print or
  *    of the photo does not hide a mark.
  *  - paper: measured on the sheet itself, in the gaps between bubbles of the same row (median of 3 gaps per answer row; one
  *    smudge cannot spoil it). A shadow over one half of the sheet therefore does not matter.
@@ -38,7 +38,10 @@ import kotlin.math.max
 internal class OmrLayout(
     val omr: OmrSettings = OmrSettings(),
     val setCodes: List<String> = emptyList(),
-)
+) {
+    /** The sheet size of the exam on screen (50 / 100 / 200 answers): used when the QR code cannot be read. */
+    val kind: OmrSheetKind get() = OmrSheetKind.ofRows(omr.sheetKind)
+}
 
 internal class OmrReadParams(
     val fillThreshold: Double = 0.35,
@@ -46,7 +49,7 @@ internal class OmrReadParams(
     /** second / darkest above this (and second >= blankThreshold) = unsure. */
     val uncertainRatio: Double = 0.7,
     val windowFactor: Double = 0.75,
-    val searchMm: Double = 0.4,
+    val searchMm: Double = 0.6,
     val searchStepMm: Double = 0.2,
     /** paper - ink below this many grey levels = the photo is too flat to read. */
     val minContrastLevels: Double = 50.0,
@@ -91,7 +94,7 @@ internal sealed class QrStatus {
 
 internal class OmrSheetRead(
     val qr: QrStatus,
-    /** The 50 rows of the sheet, left block first (slot 0..49). */
+    /** The answer rows of the sheet, left block first (slot 0 until [kind].rows: 50, 100 or 200). */
     val rows: List<BubbleSet>,
     val roll: DigitsRead?,
     val reg: DigitsRead?,
@@ -108,6 +111,8 @@ internal class OmrSheetRead(
     /** Bubble windows that fell (partly) outside the photo. */
     val outOfImage: Int,
     val millis: Long,
+    /** The sheet size the rows were read with (from the QR code, else from the exam's setting). */
+    val kind: OmrSheetKind = OmrSheetKind.DEFAULT,
 ) {
     val qrPayload: QrPayload? get() = (qr as? QrStatus.Found)?.payload
 }
@@ -141,6 +146,9 @@ internal object OmrReader {
 
         val qr = readQr(img, align.toImage, p)
 
+        // the layout of the answer table: the QR code says which sheet size was printed, else the exam's setting
+        val kind = (qr as? QrStatus.Found)?.payload?.let { OmrSheetKind.ofVersion(it.geomVersion) } ?: layout.kind
+
         // ink: the four black squares
         val inks = OmrGeometry.cornerMarks().map { m ->
             s.mean((m.x + m.w / 2f).toDouble(), (m.y + m.h / 2f).toDouble(), 1.5)
@@ -148,18 +156,18 @@ internal object OmrReader {
         val ink = median(inks)
 
         // answer rows: bubbles + local paper from the gaps of the same row
-        val rowMeans = ArrayList<DoubleArray>(OmrGeometry.ROWS_PER_PAGE)
-        val rowPaper = DoubleArray(OmrGeometry.ROWS_PER_PAGE)
-        for (slot in 0 until OmrGeometry.ROWS_PER_PAGE) {
-            val block = slot / OmrGeometry.ROWS_PER_BLOCK
-            val row = slot % OmrGeometry.ROWS_PER_BLOCK
+        val rowMeans = ArrayList<DoubleArray>(kind.rows)
+        val rowPaper = DoubleArray(kind.rows)
+        for (slot in 0 until kind.rows) {
+            val block = slot / kind.rowsPerBlock
+            val row = slot % kind.rowsPerBlock
             rowMeans += DoubleArray(OmrGeometry.OPTIONS) { o ->
-                val b = OmrGeometry.answerBubble(block, row, o)
+                val b = OmrGeometry.answerBubble(kind, block, row, o)
                 s.darkestMean(b.x.toDouble(), b.y.toDouble())
             }
-            val y = OmrGeometry.ANS_Y[row].toDouble()
+            val y = OmrGeometry.ansY(kind, row).toDouble()
             val gaps = (0 until OmrGeometry.OPTIONS - 1).map { o ->
-                s.gapMean(OmrGeometry.FIRST_BUBBLE_X[block] + (o + 0.5) * OmrGeometry.RING_PITCH, y)
+                s.gapMean(OmrGeometry.firstBubbleX(kind, block) + (o + 0.5) * OmrGeometry.RING_PITCH, y)
             }.filter { !it.isNaN() }
             rowPaper[slot] = median(gaps)
         }
@@ -174,7 +182,7 @@ internal object OmrReader {
             return ((1.0 - mean / pp) / (1.0 - inkRatio)).coerceIn(0.0, 1.0)
         }
 
-        val rows = (0 until OmrGeometry.ROWS_PER_PAGE).map { slot ->
+        val rows = (0 until kind.rows).map { slot ->
             classify(DoubleArray(OmrGeometry.OPTIONS) { o -> dark(rowMeans[slot][o], rowPaper[slot]) }, p)
         }
 
@@ -185,7 +193,7 @@ internal object OmrReader {
             for (c in 0 until spec.cols) {
                 if (onlyCol != null && c != onlyCol) continue
                 for (i in 0 until spec.labelCounts[c] - 1) {
-                    gaps += s.gapMean(spec.bubbleX(c).toDouble(), ((spec.bubbleY(i) + spec.bubbleY(i + 1)) / 2f).toDouble())
+                    gaps += s.gapMean(spec.bubbleX(c).toDouble(), ((spec.bubbleY(i) + spec.bubbleY(i + 1)) / 2f).toDouble(), 0.5)
                 }
             }
             val gp = median(gaps.filter { !it.isNaN() })
@@ -198,7 +206,7 @@ internal object OmrReader {
                 val b = classify(
                     DoubleArray(n) { i ->
                         val pt = spec.bubble(c, i)
-                        dark(s.darkestMean(pt.x.toDouble(), pt.y.toDouble()), gp)
+                        dark(s.darkestMean(pt.x.toDouble(), pt.y.toDouble(), s.gridWindow), gp)
                     },
                     p,
                 )
@@ -214,7 +222,7 @@ internal object OmrReader {
         val reg = digits(OmrGeometry.regGrid(layout.omr))
         val subject = digits(OmrGeometry.subjectGrid(layout.omr))
         val setSpec = OmrGeometry.setGrid(layout.omr, layout.setCodes)
-        val setCol = grid(setSpec, onlyCol = 1)?.first?.firstOrNull()
+        val setCol = grid(setSpec, onlyCol = 0)?.first?.firstOrNull()
         val setFilled = setCol?.takeIf { it.state == MarkState.FILLED }?.marked?.first()
 
         return OmrSheetRead(
@@ -230,6 +238,7 @@ internal object OmrReader {
             lowContrast = !usable,
             outOfImage = s.outOfImage,
             millis = (System.nanoTime() - t0) / 1_000_000,
+            kind = kind,
         )
     }
 
@@ -282,7 +291,7 @@ internal object OmrReader {
         }
         if (!QrPayload.isIntelliQ(text)) return QrStatus.Foreign(text)
         val q = QrPayload.decode(text) ?: return QrStatus.OtherVersion(text)
-        return if (q.geomVersion != OmrGeometry.VERSION) QrStatus.OtherVersion(text) else QrStatus.Found(q)
+        return if (OmrSheetKind.ofVersion(q.geomVersion) == null) QrStatus.OtherVersion(text) else QrStatus.Found(q)
     }
 
     private class GraySource(private val g: GrayImage) : LuminanceSource(g.w, g.h) {
@@ -330,6 +339,7 @@ internal object OmrReader {
     private class Sampler(val img: GrayImage, val h: Homography, val p: OmrReadParams) {
         var outOfImage = 0
         private val window = p.windowFactor * OmrGeometry.BUBBLE_INNER_R
+        val gridWindow = p.windowFactor * OmrGeometry.GRID_INNER_R
         private val offsets: DoubleArray = run {
             val k = max(0, Math.round(p.searchMm / p.searchStepMm).toInt())
             DoubleArray(2 * k + 1) { (it - k) * p.searchStepMm }
@@ -361,10 +371,10 @@ internal object OmrReader {
         }
 
         /** The darkest mean of the bubble window over the small search grid around (x, y). */
-        fun darkestMean(x: Double, y: Double): Double {
+        fun darkestMean(x: Double, y: Double, win: Double = window): Double {
             var best = Double.NaN
             for (dy in offsets) for (dx in offsets) {
-                val m = mean(x + dx, y + dy, window)
+                val m = mean(x + dx, y + dy, win)
                 if (!m.isNaN() && (best.isNaN() || m < best)) best = m
             }
             if (best.isNaN()) outOfImage++
@@ -372,7 +382,7 @@ internal object OmrReader {
         }
 
         /** Paper between bubbles: one small disc, no search. */
-        fun gapMean(x: Double, y: Double): Double = mean(x, y, 0.9)
+        fun gapMean(x: Double, y: Double, r: Double = 0.9): Double = mean(x, y, r)
     }
 
     private fun median(v: List<Double>): Double {

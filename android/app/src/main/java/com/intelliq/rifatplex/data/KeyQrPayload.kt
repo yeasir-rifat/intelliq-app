@@ -131,12 +131,12 @@ data class KeyQrPayload(
          * The payload of one answer-sheet page, or null when a value is out of range or the page has no MCQ
          * (no QR is printed then). [items] are the entries of THIS page in number order.
          */
-        fun forPage(examId: String, setIndex: Int?, page: Int, pages: Int, items: List<KeyItem>, rules: GradingRules): KeyQrPayload? {
+        fun forPage(examId: String, setIndex: Int?, page: Int, pages: Int, items: List<KeyItem>, rules: GradingRules, sheetRows: Int = 200): KeyQrPayload? {
             val r = rules.sane()
             val p = KeyQrPayload(
                 examId = examId,
                 setIndex = setIndex,
-                geomVersion = OmrGeometry.VERSION,
+                geomVersion = OmrSheetKind.ofRows(sheetRows).geomVersion,
                 page = page,
                 pages = pages,
                 marksX100 = (r.marksPerQ * 100).roundToInt().coerceAtLeast(1),

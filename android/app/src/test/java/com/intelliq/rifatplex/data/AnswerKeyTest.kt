@@ -69,20 +69,20 @@ class AnswerKeyTest {
 
         val twenty = omrRows((1..20).toList())
         assertEquals(1, twenty.size)
-        assertEquals(50, twenty[0].size)
-        assertEquals((1..50).toList(), twenty[0]) // rows after the last MCQ are simply numbered on
+        assertEquals(200, twenty[0].size)
+        assertEquals((1..200).toList(), twenty[0]) // rows after the last MCQ are simply numbered on
 
-        val sixty = omrRows((1..60).toList())
+        val sixty = omrRows((1..260).toList())
         assertEquals(2, sixty.size)
-        assertEquals(50, sixty[0].size)
-        assertEquals(50, sixty[1].size)
-        assertEquals(51, sixty[1][0])
-        assertEquals(100, sixty[1][49])
+        assertEquals(200, sixty[0].size)
+        assertEquals(200, sixty[1].size)
+        assertEquals(201, sixty[1][0])
+        assertEquals(400, sixty[1][199])
     }
 
     @Test
     fun sheetCountOfTheSnapshotEqualsThePrintedSheets() {
-        for (n in listOf(0, 1, 49, 50, 51, 100, 101, 150)) {
+        for (n in listOf(0, 1, 199, 200, 201, 400, 401, 450)) {
             val qs = (1..n).map { mcq("q$it", it % 4) }
             val numbers = qs.mapIndexed { i, q -> q.id to i + 1 }.toMap()
             val snap = build(qs, numbers)
@@ -93,15 +93,15 @@ class AnswerKeyTest {
 
     @Test
     fun itemAtFindsTheMcqOfARow() {
-        val qs = (1..60).map { mcq("q$it", it % 4) }
+        val qs = (1..260).map { mcq("q$it", it % 4) }
         val snap = build(qs, qs.mapIndexed { i, q -> q.id to i + 1 }.toMap())
         assertEquals(1, snap.itemAt(0, 0)?.printedNumber)
-        assertEquals(50, snap.itemAt(0, 49)?.printedNumber)
-        assertEquals(51, snap.itemAt(1, 0)?.printedNumber)
-        assertEquals(60, snap.itemAt(1, 9)?.printedNumber)
-        assertNull(snap.itemAt(1, 10)) // a blank extra row
+        assertEquals(200, snap.itemAt(0, 199)?.printedNumber)
+        assertEquals(201, snap.itemAt(1, 0)?.printedNumber)
+        assertEquals(260, snap.itemAt(1, 59)?.printedNumber)
+        assertNull(snap.itemAt(1, 60)) // a blank extra row
         assertNull(snap.itemAt(2, 0))
-        assertNull(snap.itemAt(0, 50))
+        assertNull(snap.itemAt(0, 200))
         assertNull(snap.itemAt(-1, 0))
     }
 

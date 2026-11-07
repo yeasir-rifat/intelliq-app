@@ -1,6 +1,9 @@
 package com.intelliq.rifatplex.data
 
 /*
+ * 200-answer sheet (geometry VERSION 2): 5 blocks of 40 answers (50 and 100 answer sheets: see OmrSheetKind), header with exam-code / centre / roll / set grids, name,
+ * district and signature boxes (same arrangement as the common 200-question BCS style sheet, no third-party branding).
+ *
  * Step 4.1 - the geometry of the OMR sheet in ONE place.
  *
  * Until now the positions of the bubbles, scanner marks and digit grids lived inside the drawing code of
@@ -62,80 +65,121 @@ internal class DigitGridSpec(
     val bottom: Float get() = gy + (0 until cols).maxOf { colHeight(it) }
 }
 
+/**
+ * The three sheet sizes the user can choose (number of answer rows on one A4 sheet). Everything except the answer table
+ * is identical (corner squares, timing dashes, QR box, header grids), so the aligner needs no change. [geomVersion] is
+ * what the QR code carries, so the scanner knows the layout of a sheet from its code: 2 = 200 (the original v2 sheet,
+ * unchanged), 3 = 100, 4 = 50.
+ */
+internal enum class OmrSheetKind(val rows: Int, val blocks: Int, val geomVersion: Int) {
+    K50(50, 2, 4),
+    K100(100, 4, 3),
+    K200(200, 5, 2);
+
+    val rowsPerBlock: Int get() = rows / blocks
+
+    companion object {
+        val DEFAULT = K200
+
+        /** The kind with [rows] answer rows, [DEFAULT] for any other number (old saved settings, bad input). */
+        fun ofRows(rows: Int): OmrSheetKind = values().firstOrNull { it.rows == rows } ?: DEFAULT
+
+        /** The kind a QR code's geometry version stands for, null when the version is unknown. */
+        fun ofVersion(v: Int): OmrSheetKind? = values().firstOrNull { it.geomVersion == v }
+
+        /**
+         * The smallest sheet that holds [mcqCount] MCQs on one page (50, then 100, then 200); more than 200 give [K200] (several
+         * sheets). Null for no MCQ at all. Only a hint for the user: nothing here changes the chosen size.
+         */
+        fun suggest(mcqCount: Int): OmrSheetKind? =
+            if (mcqCount <= 0) null else values().sortedBy { it.rows }.firstOrNull { it.rows >= mcqCount } ?: K200
+    }
+}
+
 internal object OmrGeometry {
-    /** Bump this when ANY number below changes. It is printed into the sheet's QR code (step 4.2). */
-    const val VERSION = 1
+    /** Bump this when ANY number below changes. It is printed into the sheet's QR code (step 4.2). 1 = old 50-answer sheet. */
+    const val VERSION = 2
 
     const val PAGE_W_MM = 210f
     const val PAGE_H_MM = 297f
 
-    /** Answers per sheet: 2 blocks of 25. More MCQs continue on the next sheet. */
-    const val ROWS_PER_PAGE = 50
-    const val ROWS_PER_BLOCK = 25
-    const val BLOCKS = 2
+    /** Answers per sheet: 5 blocks of 40. More MCQs continue on the next sheet. */
+    const val ROWS_PER_PAGE = 200
+    const val ROWS_PER_BLOCK = 40
+    const val BLOCKS = 5
     const val OPTIONS = 4
 
     /** Largest number of sets the set-code column can show. */
     const val MAX_SETS = 10
 
     // ---- bubbles (a printed ring: the centre line has radius RING_R, the ink is RING_STROKE thick)
-    const val RING_R = 1.615f
+    const val RING_R = 1.5f
     const val RING_STROKE = 0.17f
-    /** Inside edge of the ring: the scanner only measures inside this circle (use a smaller window, e.g. 0.75 x). */
-    const val BUBBLE_INNER_R = RING_R - RING_STROKE / 2f // 1.53 mm
-    const val RING_PITCH = 6.096f // distance between two bubbles of a row
+    /** Ring of the small digit-grid bubbles (roll, set, ...). */
+    const val GRID_RING_R = 1.2f
+    /** Inside edge of the answer ring: the scanner only measures inside this circle (use a smaller window, e.g. 0.75 x). */
+    const val BUBBLE_INNER_R = RING_R - RING_STROKE / 2f
+    const val GRID_INNER_R = GRID_RING_R - RING_STROKE / 2f
+    const val RING_PITCH = 6.0f // distance between two bubbles of a row
 
-    // ---- answer blocks
-    const val HEAD_TOP = 50.533f // top of the answer blocks and of the label boxes
-    const val HEAD_BOTTOM = 58.022f // bottom of the answer-block header / label boxes
-    const val BLOCK_W = 33.279f
-    const val QNUM_W = 5.829f // question-number column
-    const val HALF_BAND = 2.16f // half height of the tinted band behind one answer
+    // ---- answer table
+    const val HEAD_TOP = 100.0f // top of the answer table
+    const val HEAD_BOTTOM = 105.0f // bottom of the table header ("Q.No | Answer")
+    const val ROW_PITCH = 4.36f
+    const val BLOCK_W = 34.4f
+    const val QNUM_W = 7.0f // question-number column
+    const val HALF_BAND = ROW_PITCH / 2f
+    const val TABLE_BOTTOM = HEAD_BOTTOM + ROWS_PER_BLOCK * ROW_PITCH // 279.4
 
-    /** Left edge of the two answer blocks. */
-    val BLOCK_X = floatArrayOf(23.343f, 62.953f)
+    /** Left edge of the five answer blocks. */
+    val BLOCK_X = FloatArray(BLOCKS) { 15.0f + it * 36.4f }
 
     /** Centre x of the first (option 0) bubble of each block. */
-    val FIRST_BUBBLE_X = floatArrayOf(33.753f, 73.363f)
+    val FIRST_BUBBLE_X = FloatArray(BLOCKS) { BLOCK_X[it] + QNUM_W + 1.7f + RING_PITCH / 2f }
 
-    /** Centre y of the bubbles of answers 1..25 (the artwork is laid out by hand, so the spacing is not perfectly even). */
-    val ANS_Y = floatArrayOf(
-        60.183f, 68.824f, 77.466f, 86.107f, 94.749f, 103.390f, 112.032f, 120.673f, 129.314f, 137.956f, 146.597f, 155.239f, 163.880f,
-        172.522f, 181.163f, 189.516f, 198.158f, 206.799f, 215.441f, 224.082f, 232.724f, 241.365f, 249.889f, 258.531f, 267.172f,
-    )
+    /** Centre y of the bubbles of answers 1..40 of a block. */
+    val ANS_Y = FloatArray(ROWS_PER_BLOCK) { HEAD_BOTTOM + ROW_PITCH * (it + 0.5f) }
 
     // ---- digit grids
-    const val GRID_BOX_ROW = 4.878f // row of write-in boxes on top of a digit grid
-    const val GRID_COL_W = 5.5116f // width of one digit column (roll, registration, subject)
+    const val GRID_LABEL_TOP = 29.0f // top of the titled boxes
+    const val GRID_TOP = 34.5f // bottom of the label boxes = top of the write-in boxes
+    const val GRID_BOX_ROW = 4.6f // row of write-in boxes on top of a digit grid
 
-    /** Bubble centres of every digit grid, measured from the top of the grid frame (the same for roll, set, registration and subject). */
-    val GRID_DY = floatArrayOf(7.907f, 13.787f, 19.613f, 25.626f, 31.536f, 37.437f, 43.284f, 49.063f, 55.198f, 60.648f)
-
-    const val GRID_TAIL_A = 4.42f // frame bottom below the last bubble (roll number)
-    const val GRID_TAIL_B = 4.23f // registration number, subject code
-    const val GRID_TAIL_SET = 3.93f
+    /** Bubble centres of every digit grid, measured from the top of the grid frame. */
+    val GRID_DY = FloatArray(10) { 6.9f + it * 3.55f }
+    const val GRID_TAIL = 2.6f
 
     // ---- scanner marks
-    const val MARK_SIZE = 4.801f // the four corner squares
-    const val TIMING_COUNT = 52
-    const val TIMING_X = 13.471f
-    const val TIMING_Y0 = 37.066f
-    const val TIMING_PITCH = 4.5064f
+    const val MARK_SIZE = 4.8f // the four corner squares
+    const val MARK_X_LEFT = 8.0f
+    const val MARK_X_RIGHT = 197.2f
+    const val MARK_Y_TOP = 88.0f
+    const val MARK_Y_BOTTOM = 283.4f
+    /** Distance between the mark centres, horizontally and vertically. */
+    const val MARKS_SPAN_X = MARK_X_RIGHT - MARK_X_LEFT
+    const val MARKS_SPAN_Y = MARK_Y_BOTTOM - MARK_Y_TOP
+    /** Height / width of the rectangle of mark centres (1.03): the scanner prefers the corner quad closest to it. */
+    const val MARKS_ASPECT = MARKS_SPAN_Y / MARKS_SPAN_X
+
+    const val TIMING_COUNT = 40
+    const val TIMING_X = MARK_X_LEFT
+    const val TIMING_Y0 = 95.0f
+    const val TIMING_PITCH = 4.5f
     const val TIMING_W = MARK_SIZE
     const val TIMING_H = 1.114f
 
-    // ---- QR code (step 4.2): top right, under the corner square, above the invigilator box
+    // ---- QR code (step 4.2): right of the lower "do not mark" box, above the answer table
 
     /** The QR box including its quiet zone (white margin). */
     const val QR_BOX_MM = 18f
-    const val QR_BOX_X = 172f
-    const val QR_BOX_Y = 29.5f
+    const val QR_BOX_X = 146f
+    const val QR_BOX_Y = 77f
 
     /** White margin inside the box on every side; the code itself is [QR_CODE_MM] square. */
     const val QR_QUIET_MM = 2f
     const val QR_CODE_MM = QR_BOX_MM - 2f * QR_QUIET_MM
 
-    /** The sheet title is centred on x 105 and at most this wide, so it never reaches the QR box. */
+    /** The sheet title is centred on x 105 and at most this wide. */
     const val TITLE_MAX_W = 130f
 
     /** Where the scanner looks for the QR code first (and where the sheet prints it). */
@@ -150,56 +194,94 @@ internal object OmrGeometry {
         return setCodes.map { it.trim() }.filter { it.isNotEmpty() }.take(MAX_SETS).indexOf(code).takeIf { it >= 0 }
     }
 
-    /**
-     * The marks box the examiner writes the score in: its whole frame, the left part (x .. x+10.4) is for the number and the
-     * right part holds the printed label. Same rule as the sheet drawing: it sits under the set code and is left out when
-     * there is not enough room or it is switched off. Null = the sheet has no marks box.
-     */
-    fun marksBox(omr: OmrSettings, setCodes: List<String>): RectMm? {
-        val o = omr.effective()
-        if (!o.showMarks) return null
-        val setBottom = setGrid(o, setCodes)?.bottom ?: HEAD_BOTTOM
-        val my = maxOf(92.77f, setBottom + 4f)
-        val mh = 122.87f - my
-        return if (mh >= 16f) RectMm(148.7f, my, 16.12f, mh) else null
-    }
+    /** The 200-answer sheet has no marks box (kept for the result PDF, which then draws nothing). */
+    @Suppress("UNUSED_PARAMETER")
+    fun marksBox(omr: OmrSettings, setCodes: List<String>): RectMm? = null
 
     /** The four corner squares, in the order top-left, top-right, bottom-left, bottom-right. */
     fun cornerMarks(): List<RectMm> = listOf(
-        RectMm(13.471f, 14.659f, MARK_SIZE, MARK_SIZE),
-        RectMm(191.101f, 14.659f, MARK_SIZE, MARK_SIZE),
-        RectMm(13.471f, 277.540f, MARK_SIZE, MARK_SIZE),
-        RectMm(191.101f, 277.540f, MARK_SIZE, MARK_SIZE),
+        RectMm(MARK_X_LEFT, MARK_Y_TOP, MARK_SIZE, MARK_SIZE),
+        RectMm(MARK_X_RIGHT, MARK_Y_TOP, MARK_SIZE, MARK_SIZE),
+        RectMm(MARK_X_LEFT, MARK_Y_BOTTOM, MARK_SIZE, MARK_SIZE),
+        RectMm(MARK_X_RIGHT, MARK_Y_BOTTOM, MARK_SIZE, MARK_SIZE),
     )
 
-    /** The 52 timing dashes down the left edge, top to bottom. */
+    /** The timing dashes down the left edge between the two left squares, top to bottom. */
     fun timingDashes(): List<RectMm> =
         (0 until TIMING_COUNT).map { i -> RectMm(TIMING_X, TIMING_Y0 + i * TIMING_PITCH, TIMING_W, TIMING_H) }
 
     // ---- answer bubbles
 
-    /** Centre of option [option] (0 = first) of row [row] (0..24) in answer block [block] (0 or 1). */
+    /** Centre of option [option] (0 = first) of row [row] (0..39) in answer block [block] (0..4). */
     fun answerBubble(block: Int, row: Int, option: Int): PointMm =
         PointMm(FIRST_BUBBLE_X[block] + option * RING_PITCH, ANS_Y[row])
 
-    /** Same, counting the answers of a sheet from 0 to 49 (0..24 = left block, 25..49 = right block). */
+    /** Same, counting the answers of a sheet from 0 to 199 (block after block, 40 each). */
     fun answerBubbleOfSlot(slot: Int, option: Int): PointMm =
         answerBubble(slot / ROWS_PER_BLOCK, slot % ROWS_PER_BLOCK, option)
 
+    // ---- sheet sizes (50 / 100 / 200 answers): only the answer table changes, the table keeps its height
+
+    /** Height of one answer block's rows (the same for every sheet size). */
+    const val TABLE_H = ROWS_PER_BLOCK * ROW_PITCH
+
+    /** Gap between two answer blocks. */
+    const val BLOCK_GAP = 2.0f
+
+    /** Distance between two rows: the 200 sheet keeps its measured pitch, the others share the same table height. */
+    fun rowPitch(kind: OmrSheetKind): Float = if (kind == OmrSheetKind.K200) ROW_PITCH else TABLE_H / kind.rowsPerBlock
+
+    /** Left edge of answer block [block]: the 200 sheet keeps its numbers, fewer blocks are centred on the page. */
+    fun blockX(kind: OmrSheetKind, block: Int): Float {
+        if (kind == OmrSheetKind.K200) return BLOCK_X[block]
+        val span = kind.blocks * BLOCK_W + (kind.blocks - 1) * BLOCK_GAP
+        return PAGE_W_MM / 2f - span / 2f + block * (BLOCK_W + BLOCK_GAP)
+    }
+
+    /** Centre x of option 0 of answer block [block]. */
+    fun firstBubbleX(kind: OmrSheetKind, block: Int): Float =
+        if (kind == OmrSheetKind.K200) FIRST_BUBBLE_X[block] else blockX(kind, block) + QNUM_W + 1.7f + RING_PITCH / 2f
+
+    /** Centre y of the bubbles of row [row] (0-based) of any block. */
+    fun ansY(kind: OmrSheetKind, row: Int): Float =
+        if (kind == OmrSheetKind.K200) ANS_Y[row] else HEAD_BOTTOM + rowPitch(kind) * (row + 0.5f)
+
+    fun answerBubble(kind: OmrSheetKind, block: Int, row: Int, option: Int): PointMm =
+        PointMm(firstBubbleX(kind, block) + option * RING_PITCH, ansY(kind, row))
+
+    /** Centre of option [option] of the answer in row [slot] (0 until kind.rows, block after block). */
+    fun answerBubbleOfSlot(kind: OmrSheetKind, slot: Int, option: Int): PointMm =
+        answerBubble(kind, slot / kind.rowsPerBlock, slot % kind.rowsPerBlock, option)
+
     // ---- digit grids (each is null when the block is switched off in the OMR settings)
 
-    /** Roll number: 1..8 digits, every digit column has the bubbles 0..9. */
+    private fun grid(gx: Float, colW: Float, n: Int, labelCount: Int, labelW: Float = n * colW): DigitGridSpec =
+        DigitGridSpec(
+            gx = gx, gy = GRID_TOP,
+            widths = List(n) { colW }, labelCounts = List(n) { labelCount },
+            dys = GRID_DY, tail = GRID_TAIL, stepped = false,
+            labelBox = RectMm(gx, GRID_LABEL_TOP, labelW, GRID_TOP - GRID_LABEL_TOP),
+        )
+
+    /** Exam / subject code: 1..2 digits (the first small block on the left). */
+    fun subjectGrid(omr: OmrSettings): DigitGridSpec? {
+        val o = omr.effective()
+        if (!o.showSubject) return null
+        return grid(15.0f, 7.0f, o.subjectDigits.coerceIn(1, 2), 10)
+    }
+
+    /** Centre code: 1..2 digits (the second small block). */
+    fun regGrid(omr: OmrSettings): DigitGridSpec? {
+        val o = omr.effective()
+        if (!o.showReg) return null
+        return grid(32.0f, 7.0f, o.regDigits.coerceIn(1, 2), 10)
+    }
+
+    /** Roll / registration number: 1..8 digits, every digit column has the bubbles 0..9. */
     fun rollGrid(omr: OmrSettings): DigitGridSpec? {
         val o = omr.effective()
         if (!o.showRoll) return null
-        val n = o.rollDigits.coerceIn(1, 8)
-        val colW = minOf(GRID_COL_W, 33.07f / n)
-        return DigitGridSpec(
-            gx = 105.583f, gy = HEAD_BOTTOM,
-            widths = List(n) { colW }, labelCounts = List(n) { 10 },
-            dys = GRID_DY, tail = GRID_TAIL_A, stepped = false,
-            labelBox = RectMm(102.678f, HEAD_TOP, n * colW + 5.8f, HEAD_BOTTOM - HEAD_TOP),
-        )
+        return grid(49.0f, 6.2f, o.rollDigits.coerceIn(1, 8), 10)
     }
 
     /** How many bubbles the set-code column has: one per named set (at most [MAX_SETS]), 4 when no set is named. */
@@ -208,45 +290,16 @@ internal object OmrGeometry {
         return if (n == 0) 4 else n
     }
 
-    /** Set code: three columns, only the middle one has bubbles (one per set). */
+    /** Set code: ONE column with one bubble per set (column 0). */
     fun setGrid(omr: OmrSettings, setCodes: List<String>): DigitGridSpec? {
         val o = omr.effective()
         if (!o.showSet) return null
-        return DigitGridSpec(
-            gx = 148.248f, gy = HEAD_BOTTOM,
-            widths = listOf(5.71f, 5.09f, 5.7f), labelCounts = listOf(0, setBubbleCount(setCodes), 0),
-            dys = GRID_DY, tail = GRID_TAIL_SET, stepped = false,
-            labelBox = RectMm(145.377f, HEAD_TOP, 22.239f, HEAD_BOTTOM - HEAD_TOP),
-        )
+        return grid(101.5f, 8.0f, 1, setBubbleCount(setCodes))
     }
 
-    /** Registration number: 1..12 digits. */
-    fun regGrid(omr: OmrSettings): DigitGridSpec? {
-        val o = omr.effective()
-        if (!o.showReg) return null
-        val n = o.regDigits.coerceIn(1, 12)
-        val colW = minOf(6.15f, 55.116f / n)
-        return DigitGridSpec(
-            gx = 105.559f, gy = 137.107f,
-            widths = List(n) { colW }, labelCounts = List(n) { 10 },
-            dys = GRID_DY, tail = GRID_TAIL_B, stepped = false,
-            labelBox = RectMm(102.678f, 129.56f, n * colW + 5.762f, 7.489f),
-        )
-    }
-
-    /** Subject code: 1..4 digits; the first digit only goes 0..3 on a code of three or more digits (its frame ends under the 3). */
-    fun subjectGrid(omr: OmrSettings): DigitGridSpec? {
-        val o = omr.effective()
-        if (!o.showSubject) return null
-        val n = o.subjectDigits.coerceIn(1, 4)
-        val colW = GRID_COL_W
-        val gx = 188.124f - n * colW // the grid ends at the same place whatever the number of digits
-        val boxW = n * colW + 5.7f
-        return DigitGridSpec(
-            gx = gx, gy = 137.003f,
-            widths = List(n) { colW }, labelCounts = List(n) { c -> if (c == 0 && n >= 3) 4 else 10 },
-            dys = GRID_DY, tail = GRID_TAIL_B, stepped = true,
-            labelBox = RectMm(gx - 2.85f, 129.508f, boxW, 7.489f),
-        )
-    }
+    /** Right-hand boxes of the header (name, district, candidate signature, invigilator), for the sheet drawing. */
+    val NAME_BOX = RectMm(113.0f, 29.0f, 70.0f, 22.0f)
+    val DISTRICT_BOX = RectMm(113.0f, 53.0f, 32.0f, 22.95f)
+    val SIGN_BOX = RectMm(147.0f, 53.0f, 36.0f, 22.95f)
+    val INVIG_BOX = RectMm(185.0f, 29.0f, 10.0f, 46.95f)
 }

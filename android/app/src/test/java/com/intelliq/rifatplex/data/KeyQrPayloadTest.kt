@@ -16,7 +16,7 @@ class KeyQrPayloadTest {
 
     @Test
     fun exampleOfTheSpec() {
-        val text = "IQK1:K7M2QX9A:2:1:0:1:100:25:1-4.7:B1CA0"
+        val text = "IQK1:K7M2QX9A:2:2:0:1:100:25:1-4.7:B1CA0"
         val p = KeyQrPayload.decode(text)!!
         assertEquals(listOf(1, 2, 3, 4, 7), p.numbers)
         // B = 11 = bits 0,1,3 | 1 = bit 0 | C = 12 = bits 2,3 | A = 10 = bits 1,3 | 0 = nothing marked
@@ -76,12 +76,12 @@ class KeyQrPayloadTest {
 
     @Test
     fun badTextIsNull() {
-        val good = "IQK1:K7M2QX9A:2:1:0:1:100:25:1-4.7:B1CA0"
+        val good = "IQK1:K7M2QX9A:2:2:0:1:100:25:1-4.7:B1CA0"
         assertNotNull(KeyQrPayload.decode(good))
-        assertNull(KeyQrPayload.decode("IQK2:K7M2QX9A:2:1:0:1:100:25:1-4.7:B1CA0"))   // other format version
-        assertNull(KeyQrPayload.decode("IQ1;K7M2QX9A;2;1;0;1"))                       // an OMR sheet code
+        assertNull(KeyQrPayload.decode("IQK2:K7M2QX9A:2:2:0:1:100:25:1-4.7:B1CA0"))   // other format version
+        assertNull(KeyQrPayload.decode("IQ1;K7M2QX9A;2;2;0;1"))                       // an OMR sheet code
         assertNull(KeyQrPayload.decode(good.replace("K7M2QX9A", "K7M2QX0A")))         // 0 is not in the id alphabet
-        assertNull(KeyQrPayload.decode(good.replace(":2:1:0:1:", ":2:1:1:1:")))       // page 1 of 1
+        assertNull(KeyQrPayload.decode(good.replace(":2:2:0:1:", ":2:2:1:1:")))       // page 1 of 1
         assertNull(KeyQrPayload.decode(good.replace("B1CA0", "B1CA")))                // fewer answers than numbers
         assertNull(KeyQrPayload.decode(good.replace("B1CA0", "B1CA!")))               // character outside the alphabet
         assertNull(KeyQrPayload.decode(good.replace("1-4.7", "4-1.7")))               // backwards range
@@ -131,8 +131,21 @@ class KeyQrPayloadTest {
         assertEquals(id, s.examId); assertEquals(1, s.setIndex); assertEquals(OmrGeometry.VERSION, s.geomVersion)
         assertEquals(1.0, s.marksPerQ, 0.0); assertEquals(0.25, s.negativePerWrong, 0.0)
         assertEquals(9L, s.createdAt)
-        // item i sits on sheet i / 50, as in the snapshot made on the device that printed it
-        assertEquals(5, s.sheets)
+        // item i sits on sheet i / 200 (the default size, geometry version 2), as in the snapshot made on the device that printed it
+        assertEquals(2, s.sheets)
+    }
+
+    @Test
+    fun assembledSnapshotKeepsTheSheetSizeOfTheCodes() {
+        // the same 220 answers: 50-row sheets (geometry version 4) are 5 sheets, 100-row sheets (version 3) 3, 200-row sheets (version 2) 2
+        for ((rows, sheets) in listOf(50 to 5, 100 to 3, 200 to 2)) {
+            val a = KeyQrPayload.forPage(id, 1, 0, 3, items(1, 100), rules, rows)!!
+            val b = KeyQrPayload.forPage(id, 1, 1, 3, items(101, 100), rules, rows)!!
+            val c = KeyQrPayload.forPage(id, 1, 2, 3, items(201, 20), rules, rows)!!
+            val s = (KeyQrPayload.assemble(listOf(a, b, c), 9L) as KeyQrAssembly.Done).snapshot
+            assertEquals(OmrSheetKind.ofRows(rows).geomVersion, s.geomVersion)
+            assertEquals("rows=$rows", sheets, s.sheets)
+        }
     }
 
     @Test

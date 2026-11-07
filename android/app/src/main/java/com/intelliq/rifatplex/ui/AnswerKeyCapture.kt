@@ -56,7 +56,7 @@ object AnswerKeyCapture {
                 failed++
                 continue
             }
-            val snap = AnswerKey.build(d.examId, setIndex, qs, numbers, d.grading)
+            val snap = AnswerKey.build(d.examId, setIndex, qs, numbers, d.grading, sheetRows = d.settings.omr.sheetKind)
             store.put(snap)
             saved++
             unanswered += snap.unanswered

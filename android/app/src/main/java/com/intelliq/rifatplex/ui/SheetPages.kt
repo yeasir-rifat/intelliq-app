@@ -41,6 +41,7 @@ import com.intelliq.rifatplex.data.QType
 import com.intelliq.rifatplex.data.QrPayload
 import com.intelliq.rifatplex.data.SheetStyle
 import com.intelliq.rifatplex.data.Question
+import com.intelliq.rifatplex.data.omrLiveRows
 import com.intelliq.rifatplex.data.omrRows
 import com.intelliq.rifatplex.data.formatNumber
 import com.intelliq.rifatplex.ui.theme.IQ
@@ -55,7 +56,7 @@ private fun mmToDp(mm: Float): Dp = (mm * 96f / 25.4f).dp
  *  - PDF export ([printPage] >= 0): exactly one page-sized page, no shadow / border / gap, and [onPrintLayout] is told
  *    (page, total pages) so [PdfExport] knows when the page is ready
  *
- * The OMR sheet ([OmrPage]) holds 50 answers per sheet, so 51+ MCQs give a second sheet and so on.
+ * The OMR sheet ([OmrPage]) holds 200 answers per sheet, so 201+ MCQs give a second sheet and so on.
  * The answer sheet ([KeyPage], "উত্তরমালা") lists "printed number (correct option)" of every MCQ, e.g. "১ (খ)", and has a
  * QR code on every page (step 4.8): the bridge to the OMR sheets, see [KeyQrPayload].
  * Both sheets show the numbers PRINTED on the question paper. With Document AutoFix on, those are learned first by
@@ -104,11 +105,15 @@ fun SheetPages(
     }
     val numbersReady = !needNumbers || numbers != null
 
-    // OMR: the printed numbers of the MCQs, 50 per sheet (see omrRows). While the AutoFix numbers are still being
+    // OMR: the printed numbers of the MCQs, 50 / 100 / 200 per sheet (see omrRows, settings.omr.sheetKind). While the AutoFix numbers are still being
     // learned the plain numbers are shown, so the preview keeps its page count; the PDF waits for the real ones.
+    val omrMcqCount: Int = if (kind == DocKind.OMR) {
+        val rowNumbers = numbers ?: plainNumbers
+        remember(questions, rowNumbers) { AnswerKey.printedMcqs(questions, rowNumbers).size }
+    } else 0
     val chunks: List<List<Int>> = if (kind == DocKind.OMR) {
         val rowNumbers = numbers ?: plainNumbers
-        remember(questions, rowNumbers) { omrRows(AnswerKey.printedMcqs(questions, rowNumbers).map { it.first }) }
+        remember(questions, rowNumbers, settings.omr.sheetKind) { omrRows(AnswerKey.printedMcqs(questions, rowNumbers).map { it.first }, settings.omr.sheetKind) }
     } else listOf(emptyList())
 
     // answer sheet: one cell per MCQ, paginated by fixed geometry
@@ -133,6 +138,7 @@ fun SheetPages(
                 SheetPageView(
                     kind, chunks.getOrElse(pi) { emptyList() }, keyPages.getOrElse(pi) { emptyList() }, keyHasMcq, keyUnanswered,
                     size.first, settings, pi, pageCount, questions, setCode, setCodes, examId, grading, doc, brand, lang, pageBg, print,
+                    omrLiveRows(omrMcqCount, settings.omr.sheetKind, pi),
                 )
             }
             if (showLabels) {
@@ -206,6 +212,8 @@ private fun SheetPageView(
     lang: Lang,
     pageBg: Color,
     print: Boolean,
+    /** OMR only: rows of this sheet that hold a real MCQ (the rest are drawn pale). */
+    liveRows: Int,
 ) {
     val c = IQ.c
     val shape = RoundedCornerShape(2.dp)
@@ -225,21 +233,22 @@ private fun SheetPageView(
                 // the QR code of this page: same exam id / set as the OMR sheets, plus this page's answers
                 val keyQr = KeyQrPayload.forPage(
                     examId, OmrGeometry.setIndexOf(setCode, setCodes), pageIndex, pageCount,
-                    keyEntries.map { KeyItem(it.number, it.positions) }, grading,
+                    keyEntries.map { KeyItem(it.number, it.positions) }, grading, settings.omr.sheetKind,
                 )
                 KeyPage(keyEntries, pageIndex, pageCount, keyHasMcq, keyUnanswered, pageWmm, doc, brand, settings, setCode, lang, Modifier.fillMaxSize(), qr = keyQr)
             }
             kind == DocKind.OMR && numbers.isNotEmpty() ->
                 OmrPage(
                     numbers, pageIndex, pageCount, doc, brand, setCodes, settings.omr, lang, Modifier.fillMaxSize(),
-                    qr = QrPayload.forSheet(examId, OmrGeometry.setIndexOf(setCode, setCodes), pageIndex, pageCount),
+                    qr = QrPayload.forSheet(examId, OmrGeometry.setIndexOf(setCode, setCodes), pageIndex, pageCount, settings.omr.sheetKind),
+                    liveRows = liveRows,
                 )
             else -> SheetPageContent(questions, setCode, doc)
         }
     }
 }
 
-/** The OMR page when there is no MCQ yet: scanner corner marks, title and a hint (the real sheet has 50 rows from the first MCQ on). */
+/** The OMR page when there is no MCQ yet: scanner corner marks, title and a hint (the real sheet has 50, 100 or 200 rows from the first MCQ on). */
 @Composable
 private fun BoxScope.SheetPageContent(questions: List<Question>, setCode: String?, doc: DocFields) {
     val ink = Color(0xFF111111)

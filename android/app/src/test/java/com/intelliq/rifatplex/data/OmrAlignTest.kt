@@ -104,9 +104,9 @@ class OmrAlignTest {
     }
 
     @Test fun coveredDashes() {
-        // a thumb over a few dashes is tolerated (at least 48 of 52 are needed) ...
+        // a thumb over a few dashes is tolerated (at least 36 of 40 are needed) ...
         val ok = expectOk("3 dashes covered", SyntheticOptions(eraseDashes = listOf(10, 11, 12), tiltDeg = 3.0))
-        assertEquals(49, ok.dashes)
+        assertEquals(37, ok.dashes)
         // ... a hand over eight is not
         expectFail("8 dashes covered", SyntheticOptions(eraseDashes = (20..27).toList()), AlignFail.MARKS_UNREADABLE)
     }

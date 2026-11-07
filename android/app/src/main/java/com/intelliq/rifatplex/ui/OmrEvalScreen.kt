@@ -73,6 +73,7 @@ import com.intelliq.rifatplex.data.KeyExisting
 import com.intelliq.rifatplex.data.KeyQrAssembly
 import com.intelliq.rifatplex.data.OmrFlag
 import com.intelliq.rifatplex.data.OmrGeometry
+import com.intelliq.rifatplex.data.OmrSheetKind
 import com.intelliq.rifatplex.data.OmrLayout
 import com.intelliq.rifatplex.data.OmrReport
 import com.intelliq.rifatplex.data.QResult
@@ -731,7 +732,7 @@ private fun EvalDetail(vm: OmrEvalViewModel, s: EvalSheet, bn: Boolean, onClose:
             val shownFlags = s.flags.filter { it != OmrFlag.KEY_INCOMPLETE || res != null }
             for (f in shownFlags) {
                 if (f == OmrFlag.ROLL_INCOMPLETE && s.rollFix != null) continue
-                Text("• " + tr("eval.flag." + f.name), color = AMBER, fontSize = 13.sp, fontFamily = uiFont())
+                Text("• " + evalFlagText(f, s.sizeMismatch, if (bn) Lang.BN else Lang.EN), color = AMBER, fontSize = 13.sp, fontFamily = uiFont())
             }
 
             // roll number: what was read ("?" = a column that was not clearly filled), fixable by hand
@@ -762,7 +763,7 @@ private fun EvalDetail(vm: OmrEvalViewModel, s: EvalSheet, bn: Boolean, onClose:
                     ) {
                         Image(bmp, null, Modifier.matchParentSize(), contentScale = ContentScale.FillBounds)
                         val al = s.align
-                        if (al != null) Canvas(Modifier.matchParentSize()) { drawResult(al, res?.rows ?: emptyList(), size.width / s.imgW) }
+                        if (al != null) Canvas(Modifier.matchParentSize()) { drawResult(al, res?.rows ?: emptyList(), size.width / s.imgW, res?.kind ?: s.read?.kind ?: OmrSheetKind.DEFAULT) }
                     }
                     if (res != null) Row(
                         Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(c.primarySoft).padding(10.dp),
@@ -872,10 +873,10 @@ private fun OptChip(label: String, marked: Boolean, correct: Boolean, onClick: (
  * Draws on the photo, at the printed bubble positions (the aligner's map): the right option green, a wrong mark red, a mark
  * the reader was unsure of amber, plus the four corner squares in blue so a misalignment shows at a glance.
  */
-private fun DrawScope.drawResult(al: AlignResult.Ok, rows: List<QResult>, k: Float) {
+private fun DrawScope.drawResult(al: AlignResult.Ok, rows: List<QResult>, k: Float, kind: OmrSheetKind) {
     val r = (OmrGeometry.BUBBLE_INNER_R * al.scalePxPerMm * k).toFloat().coerceAtLeast(2f)
     fun centre(slot: Int, o: Int): Offset {
-        val b = OmrGeometry.answerBubbleOfSlot(slot, o)
+        val b = OmrGeometry.answerBubbleOfSlot(kind, slot, o)
         val p = al.toImage.map(b.x.toDouble(), b.y.toDouble())
         return Offset((p.x * k).toFloat(), (p.y * k).toFloat())
     }

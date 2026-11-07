@@ -17,17 +17,17 @@ class OmrReaderTest {
 
     private class Case(val kind: Kind, val opt: Int, val opt2: Int)
 
-    /** 50 rows: a mix of everything, always the same. */
+    /** 200 rows: a mix of everything, always the same. */
     private fun cases(): List<Case> {
         val rnd = Random(42)
         val kinds = listOf(Kind.FILLED, Kind.FILLED, Kind.FILLED, Kind.PENCIL, Kind.BLANK, Kind.MULTI, Kind.FILLED, Kind.LIGHT, Kind.PENCIL, Kind.BLANK)
-        return (0 until 50).map { i ->
+        return (0 until 200).map { i ->
             val a = rnd.nextInt(4)
             Case(kinds[i % kinds.size], a, (a + 1 + rnd.nextInt(3)) % 4)
         }
     }
 
-    private val qrText = "IQ1;K7M2QX9A;2;1;0;1"
+    private val qrText = "IQ1;K7M2QX9A;2;2;0;1" // geometry version 2 = the 200-answer sheet
 
     /** A paper with ten named sets: the set column has 10 bubbles. */
     private val tenSets = listOf("A", "B", "C", "D", "E", "F", "G", "H", "I", "J")
@@ -36,6 +36,7 @@ class OmrReaderTest {
     private fun discs(cs: List<Case>, roll: String, set: Int): List<SynDisc> {
         val out = ArrayList<SynDisc>()
         val rad = OmrGeometry.RING_R - 0.45
+        val gridRad = OmrGeometry.GRID_RING_R - 0.4
         for ((slot, c) in cs.withIndex()) {
             fun at(o: Int) = OmrGeometry.answerBubbleOfSlot(slot, o)
             when (c.kind) {
@@ -50,9 +51,9 @@ class OmrReaderTest {
             }
         }
         val rg = OmrGeometry.rollGrid(OmrSettings())!!
-        for ((c, ch) in roll.withIndex()) rg.bubble(c, ch - '0').let { out += SynDisc(it.x.toDouble(), it.y.toDouble(), rad, 40) }
+        for ((c, ch) in roll.withIndex()) rg.bubble(c, ch - '0').let { out += SynDisc(it.x.toDouble(), it.y.toDouble(), gridRad, 40) }
         val sg = OmrGeometry.setGrid(OmrSettings(), tenSets)!!
-        sg.bubble(1, set).let { out += SynDisc(it.x.toDouble(), it.y.toDouble(), rad, 40) }
+        sg.bubble(0, set).let { out += SynDisc(it.x.toDouble(), it.y.toDouble(), gridRad, 40) }
         return out
     }
 
@@ -100,30 +101,30 @@ class OmrReaderTest {
     @Test
     fun straight() {
         val cs = cases()
-        check("straight", opts(cs = cs, roll = "204817", set = 3), cs, "204817", 3)
+        check("straight", opts(cs = cs, roll = "20481742", set = 3), cs, "20481742", 3)
     }
 
     @Test
     fun tiltedAndUpsideDown() {
         val cs = cases()
-        check("tilt +9", opts(tilt = 9.0, cs = cs, roll = "031592", set = 0), cs, "031592", 0)
-        check("tilt -11", opts(tilt = -11.0, cs = cs, roll = "999000", set = 9), cs, "999000", 9)
-        check("upside down", opts(q = 2, cs = cs, roll = "123456", set = 1), cs, "123456", 1)
-        check("quarter turn", opts(q = 1, w = 2400, h = 1800, cs = cs, roll = "654321", set = 2), cs, "654321", 2)
+        check("tilt +9", opts(tilt = 9.0, cs = cs, roll = "03159242", set = 0), cs, "03159242", 0)
+        check("tilt -11", opts(tilt = -11.0, cs = cs, roll = "99900042", set = 9), cs, "99900042", 9)
+        check("upside down", opts(q = 2, cs = cs, roll = "12345642", set = 1), cs, "12345642", 1)
+        check("quarter turn", opts(q = 1, w = 2400, h = 1800, cs = cs, roll = "65432142", set = 2), cs, "65432142", 2)
     }
 
     @Test
     fun shadowBlurNoise() {
         val cs = cases()
-        check("shadow 50%", opts(shadow = 0.5, cs = cs, roll = "204817", set = 3), cs, "204817", 3)
-        check("blur 1 + noise 8", opts(blur = 1, noise = 8.0, cs = cs, roll = "204817", set = 3), cs, "204817", 3)
-        check("perspective + tilt + shadow", opts(tilt = 6.0, perspX = 0.12, perspY = 0.15, shadow = 0.35, cs = cs, roll = "777777", set = 5), cs, "777777", 5)
+        check("shadow 50%", opts(shadow = 0.5, cs = cs, roll = "20481742", set = 3), cs, "20481742", 3)
+        check("blur 1 + noise 8", opts(blur = 1, noise = 8.0, cs = cs, roll = "20481742", set = 3), cs, "20481742", 3)
+        check("perspective + tilt + shadow", opts(tilt = 6.0, perspX = 0.12, perspY = 0.15, shadow = 0.35, cs = cs, roll = "77777742", set = 5), cs, "77777742", 5)
     }
 
     @Test
     fun smallPhoto() {
         val cs = cases()
-        check("small 1500x2000", opts(w = 1500, h = 2000, cs = cs, roll = "000001", set = 4), cs, "000001", 4)
+        check("small 1500x2000", opts(w = 1500, h = 2000, cs = cs, roll = "00000142", set = 4), cs, "00000142", 4)
     }
 
     @Test
@@ -133,7 +134,7 @@ class OmrReaderTest {
         val r = out.read
         assertTrue(r.qr is QrStatus.None)
         assertTrue(r.rows.all { it.state == MarkState.BLANK })
-        assertEquals("??????", r.roll!!.text)
+        assertEquals("?".repeat(OmrSettings().rollDigits), r.roll!!.text) // one "?" per roll column (8 by default since sheet version 2)
         assertEquals(null, r.setFilled)
     }
 
@@ -145,7 +146,7 @@ class OmrReaderTest {
         assertTrue("foreign code", (OmrReader.scan(b) as ScanOutcome.Read).read.qr is QrStatus.Foreign)
         val c = SyntheticSheet(SyntheticOptions(qr = "IQ2;whatever")).image
         assertTrue("IQ2", (OmrReader.scan(c) as ScanOutcome.Read).read.qr is QrStatus.OtherVersion)
-        val d = SyntheticSheet(SyntheticOptions(qr = "IQ1;K7M2QX9A;-;1;2;3")).image
+        val d = SyntheticSheet(SyntheticOptions(qr = "IQ1;K7M2QX9A;-;2;2;3")).image
         val q = ((OmrReader.scan(d) as ScanOutcome.Read).read.qr as QrStatus.Found).payload
         assertEquals(null, q.setIndex); assertEquals(2, q.page); assertEquals(3, q.pages)
     }
@@ -153,7 +154,7 @@ class OmrReaderTest {
     @Test
     fun answerSheetQrIsRecognisedAsKeyPage() {
         // step 4.8: a photo of the teacher's answer sheet must not be reported as "other version of the sheet"
-        val text = "IQK1:K7M2QX9A:2:1:0:1:100:0:1-3:123"
+        val text = "IQK1:K7M2QX9A:2:2:0:1:100:0:1-3:123"
         val img = SyntheticSheet(SyntheticOptions(qr = text)).image
         val q = (OmrReader.scan(img) as ScanOutcome.Read).read.qr
         assertTrue("key page", q is QrStatus.KeyPage)
